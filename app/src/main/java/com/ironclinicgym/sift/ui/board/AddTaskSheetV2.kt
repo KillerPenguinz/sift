@@ -73,7 +73,20 @@ import com.ironclinicgym.sift.ui.theme.toColor
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.ZoneId
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import com.ironclinicgym.sift.core.board.formatHourMinute
+import com.ironclinicgym.sift.core.board.formatOrdinalDate
+import com.ironclinicgym.sift.core.board.quickDateLaterToday
+import com.ironclinicgym.sift.core.board.quickDateNextMonth
+import com.ironclinicgym.sift.core.board.quickDateNextWeek
+import com.ironclinicgym.sift.core.board.quickDateTomorrow
 
 private enum class WhenPath { DATE, RANGE, BRAIN_DUMP }
 private enum class RoughRange(val label: String, val key: PriorityKey) {
@@ -88,6 +101,7 @@ fun AddTaskSheetV2(
     viewModel: BoardViewModel,
     settings: BoardSettings,
     editing: ProjectedItem?,
+    onSaved: () -> Unit = {},
     onDismiss: () -> Unit,
 ) {
     val tokens = SiftTheme.tokens
@@ -101,11 +115,12 @@ fun AddTaskSheetV2(
     var bucketId by remember { mutableStateOf(draft?.bucketId ?: existing?.bucketOptionId) }
     var whenPath by remember { mutableStateOf<WhenPath?>(
         if (draft?.isBrainDump == true) WhenPath.BRAIN_DUMP
+        else if (draft?.dateIso != null) WhenPath.DATE
         else if (existing?.due != null) WhenPath.DATE
         else null
     ) }
     var didSave by remember { mutableStateOf(false) }
-    var selectedDate by remember { mutableStateOf(existing?.due?.take(10)) }
+    var selectedDate by remember { mutableStateOf(draft?.dateIso ?: existing?.due?.take(10)) }
     var time by remember {
         val parsed = existing?.due?.takeIf { "T" in it }?.let { iso ->
             val parts = iso.substringAfter("T").split(":")
@@ -218,7 +233,7 @@ fun AddTaskSheetV2(
                     didSave = true
                     viewModel.clearDraft()
                     if (existing != null) {
-                        onDismiss()
+                        onSaved()
                     } else {
                         if (whenPath == WhenPath.BRAIN_DUMP) {
                             viewModel.setBrainDump(result.pageId)
@@ -228,7 +243,7 @@ fun AddTaskSheetV2(
                         viewModel.notifyAdded(priorityName ?: "Task", colorKey)
                         title = ""
                         notes = ""
-                        onDismiss()
+                        onSaved()
                     }
                 }
                 is WriteResult.Failure -> error = result.message
@@ -246,6 +261,7 @@ fun AddTaskSheetV2(
                     notes = notes,
                     bucketId = bucketId,
                     isBrainDump = whenPath == WhenPath.BRAIN_DUMP,
+                    dateIso = selectedDate,
                 )
             }
             onDismiss()
@@ -419,7 +435,7 @@ fun AddTaskSheetV2(
                             filled = hasDate,
                         )
                         Text(
-                            if (hasDate) humanDate(selectedDate!!) else "Date",
+                            if (hasDate) formatOrdinalDate(selectedDate!!) else "Date",
                             color = if (hasDate) todayAccent else tokens.neutrals.textSecondary.toColor(),
                             fontSize = 13.5.sp,
                             fontWeight = if (hasDate) FontWeight.SemiBold else FontWeight.Medium,
@@ -457,7 +473,7 @@ fun AddTaskSheetV2(
                             else tokens.neutrals.textTertiary.toColor().copy(alpha = 0.45f)
                         MaterialSymbol("schedule", timeColor, size = 19.sp, filled = false)
                         Text(
-                            if (time != null) "%02d:%02d".format(time!!.first, time!!.second) else "Time",
+                            if (time != null) formatHourMinute(time!!.first, time!!.second, settings.use24HourTime) else "Time",
                             color = timeColor,
                             fontSize = 13.5.sp,
                             fontWeight = FontWeight.Medium,
@@ -492,28 +508,40 @@ fun AddTaskSheetV2(
 
                 Spacer(Modifier.height(12.dp))
 
-                // Quick-date chips or helper text
-                if (!hasDate(whenPath, selectedDate)) {
-                    val today = LocalDate.now()
+                // Quick-date chips (animated collapse when a date is selected)
+                AnimatedVisibility(
+                    visible = !hasDate(whenPath, selectedDate),
+                    enter = expandVertically(animationSpec = tween(200)),
+                    exit = shrinkVertically(animationSpec = tween(200)),
+                ) {
                     Row(
                         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(7.dp),
                     ) {
                         QuickDateChip("Later today") {
+                            val now = LocalDateTime.now()
+                            val (ltDate, ltTime) = quickDateLaterToday(now.hour, now.minute, todayIso)
+                            selectedDate = ltDate
+                            time = ltTime
                             whenPath = WhenPath.DATE
-                            selectedDate = today.toString()
                         }
                         QuickDateChip("Tomorrow") {
+                            val (tmDate, tmTime) = quickDateTomorrow(todayIso)
+                            selectedDate = tmDate
+                            time = tmTime
                             whenPath = WhenPath.DATE
-                            selectedDate = today.plusDays(1).toString()
                         }
                         QuickDateChip("Next week") {
+                            val (nwDate, nwTime) = quickDateNextWeek(todayIso)
+                            selectedDate = nwDate
+                            time = nwTime
                             whenPath = WhenPath.DATE
-                            selectedDate = today.with(java.time.temporal.TemporalAdjusters.next(java.time.DayOfWeek.MONDAY)).toString()
                         }
                         QuickDateChip("Next month") {
+                            val (nmDate, nmTime) = quickDateNextMonth(todayIso)
+                            selectedDate = nmDate
+                            time = nmTime
                             whenPath = WhenPath.DATE
-                            selectedDate = today.plusMonths(1).withDayOfMonth(1).toString()
                         }
                         Box(
                             Modifier
@@ -530,7 +558,13 @@ fun AddTaskSheetV2(
                             MaterialSymbol("calendar_month", tokens.neutrals.textSecondary.toColor(), size = 18.sp, filled = false)
                         }
                     }
-                } else {
+                }
+                // Helper text (animated fade-in when date is selected)
+                AnimatedVisibility(
+                    visible = hasDate(whenPath, selectedDate),
+                    enter = fadeIn(animationSpec = tween(200)),
+                    exit = fadeOut(animationSpec = tween(150)),
+                ) {
                     Text(
                         "Sift handles the priority. Adjust anytime.",
                         color = tokens.neutrals.textTertiary.toColor(),

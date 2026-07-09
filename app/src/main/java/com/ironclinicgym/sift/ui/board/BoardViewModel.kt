@@ -528,6 +528,7 @@ class BoardViewModel(
         val notes: String,
         val bucketId: String?,
         val isBrainDump: Boolean,
+        val dateIso: String? = null,
     )
     var pendingDraft: DraftState? = null
     fun clearDraft() { pendingDraft = null }

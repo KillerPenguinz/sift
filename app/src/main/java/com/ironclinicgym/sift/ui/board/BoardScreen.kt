@@ -302,7 +302,7 @@ fun BoardScreen(
 }
 
 @Composable
-private fun MinimizedCaptureBar(
+internal fun MinimizedCaptureBar(
     modifier: Modifier = Modifier,
     onTapTask: () -> Unit,
     onTapDump: () -> Unit,

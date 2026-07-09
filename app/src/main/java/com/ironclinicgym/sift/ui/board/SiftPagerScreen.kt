@@ -53,6 +53,7 @@ fun SiftPagerScreen(
 
     var showAddTask by remember { mutableStateOf(false) }
     var editingTask by remember { mutableStateOf<ProjectedItem?>(null) }
+    var showMinimizedBar by remember { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize().background(tokens.neutrals.bg.toColor())) {
         HorizontalPager(
@@ -96,6 +97,23 @@ fun SiftPagerScreen(
         ) {
             MaterialSymbol("add", tokens.neutrals.bg.toColor(), size = 28.sp)
         }
+
+        // Minimized capture bar — shown after a successful save
+        if (showMinimizedBar && !showAddTask) {
+            MinimizedCaptureBar(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 60.dp + navBarInset, start = 16.dp, end = 16.dp),
+                onTapTask = {
+                    showMinimizedBar = false
+                    showAddTask = true
+                },
+                onTapDump = {
+                    showMinimizedBar = false
+                    showAddTask = true
+                },
+            )
+        }
     }
 
     val activeSettings = settings
@@ -104,6 +122,11 @@ fun SiftPagerScreen(
             viewModel = viewModel,
             settings = activeSettings,
             editing = editingTask,
+            onSaved = {
+                showAddTask = false
+                editingTask = null
+                showMinimizedBar = true
+            },
             onDismiss = { showAddTask = false; editingTask = null },
         )
     }
