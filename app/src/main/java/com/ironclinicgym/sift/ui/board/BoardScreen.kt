@@ -29,9 +29,6 @@ import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Snackbar
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -91,15 +88,12 @@ fun BoardScreen(
     var selectedTask by remember { mutableStateOf<Pair<com.ironclinicgym.sift.core.board.ProjectedItem, String>?>(null) }
     var taskForPriorityPicker by remember { mutableStateOf<com.ironclinicgym.sift.core.board.ProjectedItem?>(null) }
     var showPriorityPicker by remember { mutableStateOf(false) }
-    val snackbar = remember { SnackbarHostState() }
 
     // Refresh when the board opens, so data is current without waiting on the background cycle.
     LaunchedEffect(Unit) { viewModel.refresh() }
-    // Surface transient write messages (errors, snooze notices).
-    LaunchedEffect(Unit) { viewModel.messages.collect { snackbar.showSnackbar(it) } }
-    // One-shot toast when arriving from setup.
+    // One-shot confirmation when arriving from setup.
     LaunchedEffect(fromSetup) {
-        if (fromSetup) snackbar.showSnackbar("Setup complete. Syncing with Notion.")
+        if (fromSetup) viewModel.postNotification(NotificationVariant.Info("Setup complete. Syncing with Notion."))
     }
 
     Surface(Modifier.fillMaxSize(), color = tokens.neutrals.bg.toColor()) {
@@ -191,49 +185,23 @@ fun BoardScreen(
             }
         }
 
-        // Transient messages at the bottom.
-        SnackbarHost(
-            snackbar,
-            Modifier.align(Alignment.BottomCenter).padding(bottom = 70.dp),
-        ) { Snackbar(it) }
+        val activeNotification by viewModel.activeNotification.collectAsStateWithLifecycle()
+        val currentUndo = undoToken
+        val currentNotification = activeNotification
 
-        val boardNotification by viewModel.notification.collectAsStateWithLifecycle()
-        val activeNotification = boardNotification
-
-        if (undoToken != null) {
+        if (currentUndo != null) {
             TopNotificationBar(
                 variant = NotificationVariant.Reversible(
-                    message = undoToken!!.label,
+                    message = currentUndo.label,
                     icon = "swap_horiz",
                     onUndo = { viewModel.undo() },
                 ),
                 onDismiss = { viewModel.dismissUndo() },
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = insets.calculateTopPadding()),
             )
-        } else if (activeNotification != null) {
-            val variant = when (activeNotification) {
-                is BoardViewModel.BoardNotification.TaskAdded -> {
-                    val n = activeNotification as BoardViewModel.BoardNotification.TaskAdded
-                    val pColors = priorityColorsOf(n.colorKey)
-                    NotificationVariant.ConfirmPlacement(
-                        priorityName = n.priorityName,
-                        priorityIcon = priorityIconFor(n.colorKey),
-                        accentColor = pColors.accent.toColor(),
-                        onChange = { viewModel.dismissNotification() },
-                    )
-                }
-                is BoardViewModel.BoardNotification.RefreshSuccess -> NotificationVariant.RefreshSuccess
-                is BoardViewModel.BoardNotification.RefreshError -> {
-                    val n = activeNotification as BoardViewModel.BoardNotification.RefreshError
-                    NotificationVariant.RefreshError(
-                        reason = n.reason,
-                        accentColor = tokens.overdueText.toColor(),
-                        onRetry = { viewModel.dismissNotification(); viewModel.refresh() },
-                    )
-                }
-            }
+        } else if (currentNotification != null) {
             TopNotificationBar(
-                variant = variant,
+                variant = currentNotification,
                 onDismiss = { viewModel.dismissNotification() },
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = insets.calculateTopPadding()),
             )

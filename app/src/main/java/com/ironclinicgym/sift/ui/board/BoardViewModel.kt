@@ -35,13 +35,11 @@ import com.ironclinicgym.sift.data.repository.SiftRepository.RefreshResult
 import com.ironclinicgym.sift.di.AppContainer
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
+import com.ironclinicgym.sift.core.theme.PRIORITY_META
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
@@ -182,13 +180,16 @@ class BoardViewModel(
         viewModelScope.launch {
             _refresh.value = when (val result = repository.refresh()) {
                 is RefreshResult.Success -> {
-                    _notification.value = BoardNotification.RefreshSuccess
+                    postNotification(NotificationVariant.RefreshSuccess)
                     RefreshUi.Idle
                 }
                 RefreshResult.NoMapping -> RefreshUi.Idle
                 RefreshResult.NeedsReconnect -> RefreshUi.Reconnect
                 is RefreshResult.Failed -> {
-                    _notification.value = BoardNotification.RefreshError(result.message)
+                    postNotification(NotificationVariant.RefreshError(
+                        reason = result.message,
+                        onRetry = { dismissNotification(); refresh() },
+                    ))
                     RefreshUi.Error(result.message)
                 }
             }
@@ -224,9 +225,12 @@ class BoardViewModel(
     val undoToken: StateFlow<UndoToken?> = undoManager.active
     val flashPageId: StateFlow<String?> = undoManager.flashPageId
 
-    // Transient one-shot user messages (errors, snooze notices) for a snackbar.
-    private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 4)
-    val messages: SharedFlow<String> = _messages.asSharedFlow()
+    private val _activeNotification = MutableStateFlow<NotificationVariant?>(null)
+    val activeNotification: StateFlow<NotificationVariant?> = _activeNotification.asStateFlow()
+
+    fun dismissNotification() { _activeNotification.value = null }
+
+    internal fun postNotification(variant: NotificationVariant) { _activeNotification.value = variant }
 
     /** Add: suspends and returns the result so the sheet can stay open and preserve input on failure. */
     suspend fun addTask(draft: TaskDraft): WriteResult = writeService.add(draft)
@@ -267,9 +271,9 @@ class BoardViewModel(
         }
         viewModelScope.launch {
             when (val result = writeService.snooze(task.pageId, snoozeDecisionFor(task, s))) {
-                is WriteResult.Success -> { flash(task.pageId); _messages.tryEmit("Snoozed. Change in the task menu.") }
-                WriteResult.AtLowestPriority -> _messages.tryEmit("This is already the lowest priority.")
-                is WriteResult.Failure -> _messages.tryEmit(result.message)
+                is WriteResult.Success -> { flash(task.pageId); postNotification(NotificationVariant.Info("Snoozed. Change in the task menu.")) }
+                WriteResult.AtLowestPriority -> postNotification(NotificationVariant.Info("This is already the lowest priority."))
+                is WriteResult.Failure -> postNotification(NotificationVariant.Info(result.message))
                 else -> Unit
             }
         }
@@ -284,7 +288,7 @@ class BoardViewModel(
         viewModelScope.launch {
             token.highlightPageId?.let { flash(it) }
             when (val result = token.inverse()) {
-                is WriteResult.Failure -> _messages.tryEmit(result.message)
+                is WriteResult.Failure -> postNotification(NotificationVariant.Info(result.message))
                 else -> Unit
             }
         }
@@ -305,7 +309,7 @@ class BoardViewModel(
         val mapping = activeMappingNow() ?: return false
         return when (val r = recurrenceSetup.addFields(mapping)) {
             is RecurrenceSetupService.AddResult.Success -> true
-            is RecurrenceSetupService.AddResult.Failure -> { _messages.tryEmit(r.message); false }
+            is RecurrenceSetupService.AddResult.Failure -> { postNotification(NotificationVariant.Info(r.message)); false }
         }
     }
 
@@ -323,9 +327,9 @@ class BoardViewModel(
                     undoManager.offer(result.undo)
                     result.undo?.highlightPageId?.let { flash(it) }
                 }
-                is WriteResult.Failure -> _messages.tryEmit(result.message)
-                WriteResult.NeedsRecurrenceConsent -> _messages.tryEmit("Turn on recurring tasks first in the add screen.")
-                WriteResult.AtLowestPriority -> _messages.tryEmit("This is already the lowest priority.")
+                is WriteResult.Failure -> postNotification(NotificationVariant.Info(result.message))
+                WriteResult.NeedsRecurrenceConsent -> postNotification(NotificationVariant.Info("Turn on recurring tasks first in the add screen."))
+                WriteResult.AtLowestPriority -> postNotification(NotificationVariant.Info("This is already the lowest priority."))
             }
         }
     }
@@ -362,17 +366,13 @@ class BoardViewModel(
             SignalInflation.checkInflation(asapCount, active.size, protectedCount)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    sealed interface BoardNotification {
-        data class TaskAdded(val priorityName: String, val colorKey: String) : BoardNotification
-        data object RefreshSuccess : BoardNotification
-        data class RefreshError(val reason: String) : BoardNotification
-    }
-
-    private val _notification = MutableStateFlow<BoardNotification?>(null)
-    val notification: StateFlow<BoardNotification?> = _notification.asStateFlow()
-    fun dismissNotification() { _notification.value = null }
     fun notifyAdded(priorityName: String, colorKey: String) {
-        _notification.value = BoardNotification.TaskAdded(priorityName, colorKey)
+        postNotification(NotificationVariant.ConfirmPlacement(
+            priorityName = priorityName,
+            priorityIcon = PRIORITY_META.firstOrNull { it.key.name == colorKey }?.icon ?: "label",
+            colorKey = colorKey,
+            onChange = ::dismissNotification,
+        ))
     }
 
     data class DraftState(

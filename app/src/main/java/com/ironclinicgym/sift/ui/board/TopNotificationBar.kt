@@ -33,7 +33,7 @@ sealed interface NotificationVariant {
     data class ConfirmPlacement(
         val priorityName: String,
         val priorityIcon: String,
-        val accentColor: Color,
+        val colorKey: String,
         val onChange: () -> Unit,
     ) : NotificationVariant
 
@@ -47,9 +47,10 @@ sealed interface NotificationVariant {
 
     data class RefreshError(
         val reason: String,
-        val accentColor: Color,
         val onRetry: () -> Unit,
     ) : NotificationVariant
+
+    data class Info(val message: String) : NotificationVariant
 }
 
 @Composable
@@ -73,7 +74,7 @@ fun TopNotificationBar(
     ) {
         when (variant) {
             is NotificationVariant.ConfirmPlacement -> {
-                val accent = variant.accentColor
+                val accent = priorityColorsOf(variant.colorKey).accent.toColor()
                 NotificationRow(
                     bg = accent.copy(alpha = 0.16f),
                     borderColor = accent.copy(alpha = 0.30f),
@@ -169,7 +170,7 @@ fun TopNotificationBar(
             }
 
             is NotificationVariant.RefreshError -> {
-                val accent = variant.accentColor
+                val accent = tokens.overdueText.toColor()
                 NotificationRow(
                     bg = accent.copy(alpha = 0.16f),
                     borderColor = accent.copy(alpha = 0.32f),
@@ -193,6 +194,28 @@ fun TopNotificationBar(
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.clickable(onClick = variant.onRetry),
+                    )
+                    MaterialSymbol(
+                        "close",
+                        tokens.neutrals.textTertiary.toColor(),
+                        size = 19.sp,
+                        filled = false,
+                        modifier = Modifier.clickable(onClick = onDismiss),
+                    )
+                }
+            }
+
+            is NotificationVariant.Info -> {
+                NotificationRow(
+                    bg = tokens.neutrals.surfaceRaised.toColor(),
+                    borderColor = tokens.neutrals.border.toColor(),
+                ) {
+                    Text(
+                        variant.message,
+                        color = tokens.neutrals.textPrimary.toColor(),
+                        fontSize = 14.5.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.weight(1f),
                     )
                     MaterialSymbol(
                         "close",

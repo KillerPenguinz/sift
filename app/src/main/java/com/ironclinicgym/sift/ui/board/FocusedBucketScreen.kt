@@ -63,11 +63,9 @@ fun FocusedPriorityScreen(viewModel: BoardViewModel, priorityId: String, onBack:
     var showAdd by remember { mutableStateOf(false) }
     var itemForPriorityPicker by remember { mutableStateOf<ProjectedItem?>(null) }
     var showPriorityPicker by remember { mutableStateOf(false) }
-    val snackbar = remember { androidx.compose.material3.SnackbarHostState() }
+    val activeNotification by viewModel.activeNotification.collectAsStateWithLifecycle()
     val tokens = SiftTheme.tokens
     val topInset = WindowInsets.safeDrawing.asPaddingValues().calculateTopPadding()
-
-    LaunchedEffect(Unit) { viewModel.messages.collect { snackbar.showSnackbar(it) } }
 
     Surface(Modifier.fillMaxSize(), color = tokens.neutrals.bg.toColor()) {
       Box(Modifier.fillMaxSize()) {
@@ -198,20 +196,23 @@ fun FocusedPriorityScreen(viewModel: BoardViewModel, priorityId: String, onBack:
             }
         }
 
-        // Transient messages at the bottom.
-        androidx.compose.material3.SnackbarHost(
-            snackbar,
-            Modifier.align(Alignment.BottomCenter),
-        ) { androidx.compose.material3.Snackbar(it) }
+        val currentUndo = undoToken
+        val currentNotification = activeNotification
 
-        undoToken?.let { token ->
+        if (currentUndo != null) {
             TopNotificationBar(
                 variant = NotificationVariant.Reversible(
-                    message = token.label,
+                    message = currentUndo.label,
                     icon = "swap_horiz",
                     onUndo = { viewModel.undo() },
                 ),
                 onDismiss = { viewModel.dismissUndo() },
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = topInset),
+            )
+        } else if (currentNotification != null) {
+            TopNotificationBar(
+                variant = currentNotification,
+                onDismiss = { viewModel.dismissNotification() },
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = topInset),
             )
         }
