@@ -234,7 +234,9 @@ class BoardViewModel(
             localStateStore.upsert(existing.copy(safetyCatchFiredBand = null))
         }
         if (evaluation.toFire.isNotEmpty()) {
-            _safetyCatchQueue.value = evaluation.toFire
+            _safetyCatchQueue.update { existing ->
+                (existing + evaluation.toFire).distinctBy { it.first.pageId }
+            }
         }
     }
 

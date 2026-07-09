@@ -65,13 +65,13 @@ fun SafetyCatchDialog(
                         .align(Alignment.TopEnd)
                         .offset(x = 4.dp, y = (-4).dp),
                     shape = MaterialTheme.shapes.extraSmall,
-                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    color = SiftTheme.tokens.neutrals.surface.toColor(),
                 ) {
                     Text(
                         "Coming soon",
                         modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        color = SiftTheme.tokens.neutrals.textTertiary.toColor(),
                     )
                 }
             }
