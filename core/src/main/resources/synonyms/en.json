@@ -1,0 +1,26 @@
+{
+  "language": "en",
+  "verified": true,
+  "roles": {
+    "PRIORITY": ["priority", "urgency", "when", "importance", "level"],
+    "BUCKET": ["bucket", "source", "category", "area", "context", "project", "type", "space", "domain"],
+    "STATUS": ["status", "done", "complete", "state", "finished", "progress"],
+    "TITLE": ["name", "title", "task", "item", "todo", "subject"],
+    "DUE_DATE": ["due", "date", "deadline", "by", "when"],
+    "NOTES": ["note", "description", "detail", "comment", "info", "memo"],
+    "WORK_FLAG": ["work", "focus", "professional", "office"],
+    "LABELS": ["label", "tag", "category", "group", "flag", "marker", "type"]
+  },
+  "priorities": {
+    "ASAP": ["asap", "urgent", "now", "critical", "immediate", "emergency", "top"],
+    "TODAY": ["today", "morning", "tonight", "daily"],
+    "TOMORROW": ["tomorrow"],
+    "SOON": ["soon", "this week", "upcoming", "next", "shortly"],
+    "LATER": ["later", "next week", "eventual", "low"],
+    "ONEDAY": ["one day", "someday", "backlog", "eventually", "maybe", "wishlist"]
+  },
+  "buckets": {
+    "WORK": ["work", "job", "office", "professional", "career", "business"],
+    "PERSONAL": ["personal", "life", "home", "private", "self", "family"]
+  }
+}

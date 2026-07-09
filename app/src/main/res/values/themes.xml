@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="Theme.Sift" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <style name="Theme.Sift.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#0A0704</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="postSplashScreenTheme">@style/Theme.Sift</item>
+    </style>
+</resources>
