@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -21,8 +20,8 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
@@ -49,19 +48,14 @@ internal enum class RRuleFrequency(val label: String) {
     YEARLY("Yearly"),
 }
 
-internal enum class MonthlyMode(val label: String) {
-    SPECIFIC_DAY("On a specific day"),
-    RELATIVE_DAY("On a relative day"),
-}
-
 private val WEEK_DAYS = listOf(
-    DayOfWeek.MONDAY to "M",
-    DayOfWeek.TUESDAY to "T",
+    DayOfWeek.MONDAY    to "M",
+    DayOfWeek.TUESDAY   to "Tu",
     DayOfWeek.WEDNESDAY to "W",
-    DayOfWeek.THURSDAY to "T",
-    DayOfWeek.FRIDAY to "F",
-    DayOfWeek.SATURDAY to "S",
-    DayOfWeek.SUNDAY to "S",
+    DayOfWeek.THURSDAY  to "Th",
+    DayOfWeek.FRIDAY    to "F",
+    DayOfWeek.SATURDAY  to "Sa",
+    DayOfWeek.SUNDAY    to "Su",
 )
 
 private val DAY_RRULE_KEYS = listOf("MO", "TU", "WE", "TH", "FR", "SA", "SU")
@@ -70,7 +64,6 @@ internal fun buildRRule(
     frequency: RRuleFrequency,
     interval: Int,
     days: Set<DayOfWeek>,
-    @Suppress("UNUSED_PARAMETER") monthlyMode: MonthlyMode,
 ): String {
     val parts = mutableListOf<String>()
     parts += "FREQ=${frequency.name}"
@@ -108,7 +101,7 @@ private fun parseDays(rrule: String): Set<DayOfWeek> {
 @Composable
 fun RecurrenceBuilderSheet(
     initialRule: String?,
-    onConfirm: (rrule: String, summary: String) -> Unit,
+    onConfirm: (rrule: String?, summary: String) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val tokens = SiftTheme.tokens
@@ -123,10 +116,8 @@ fun RecurrenceBuilderSheet(
     var selectedDays by remember {
         mutableStateOf(if (initialRule != null) parseDays(initialRule) else emptySet<DayOfWeek>())
     }
-    var monthlyMode by remember { mutableStateOf(MonthlyMode.SPECIFIC_DAY) }
-
     val rrule by remember {
-        derivedStateOf { buildRRule(frequency, interval, selectedDays, monthlyMode) }
+        derivedStateOf { buildRRule(frequency, interval, selectedDays) }
     }
     val summary by remember {
         derivedStateOf { RecurrenceText.describe(rrule) }
@@ -172,12 +163,13 @@ fun RecurrenceBuilderSheet(
             ) {
                 RRuleFrequency.entries.forEach { freq ->
                     FilterChip(
+                        modifier = Modifier.weight(1f),
                         selected = frequency == freq,
                         onClick = {
                             frequency = freq
                             if (freq != RRuleFrequency.WEEKLY) selectedDays = emptySet()
                         },
-                        label = { Text(freq.label, fontSize = 13.sp) },
+                        label = { Text(freq.label, fontSize = 13.sp, maxLines = 1) },
                     )
                 }
             }
@@ -293,39 +285,6 @@ fun RecurrenceBuilderSheet(
                 }
             }
 
-            // Monthly: mode selector
-            if (frequency == RRuleFrequency.MONTHLY) {
-                Spacer(Modifier.height(16.dp))
-                Text(
-                    "REPEATS ON",
-                    color = tokens.neutrals.textTertiary.toColor(),
-                    fontSize = 11.5.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    letterSpacing = 0.04.sp,
-                )
-                Spacer(Modifier.height(8.dp))
-                MonthlyMode.entries.forEach { mode ->
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable { monthlyMode = mode }
-                            .padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        RadioButton(
-                            selected = monthlyMode == mode,
-                            onClick = { monthlyMode = mode },
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            mode.label,
-                            color = tokens.neutrals.textPrimary.toColor(),
-                            fontSize = 15.sp,
-                        )
-                    }
-                }
-            }
-
             Spacer(Modifier.height(20.dp))
 
             Button(
@@ -333,6 +292,17 @@ fun RecurrenceBuilderSheet(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text("Done", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            }
+
+            TextButton(
+                onClick = { onConfirm(null, "Does not repeat") },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    "Remove repeat",
+                    fontSize = 15.sp,
+                    color = tokens.neutrals.textSecondary.toColor(),
+                )
             }
 
             Spacer(Modifier.height(16.dp))
