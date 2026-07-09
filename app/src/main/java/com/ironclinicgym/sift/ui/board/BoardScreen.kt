@@ -93,7 +93,7 @@ fun BoardScreen(
     LaunchedEffect(Unit) { viewModel.refresh() }
     // One-shot confirmation when arriving from setup.
     LaunchedEffect(fromSetup) {
-        if (fromSetup) viewModel.postNotification(NotificationVariant.Info("Setup complete. Syncing with Notion."))
+        if (fromSetup) viewModel.notifySetupComplete()
     }
 
     Surface(Modifier.fillMaxSize(), color = tokens.neutrals.bg.toColor()) {

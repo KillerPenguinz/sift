@@ -375,6 +375,10 @@ class BoardViewModel(
         ))
     }
 
+    fun notifySetupComplete() {
+        postNotification(NotificationVariant.Info("Setup complete. Syncing with Notion."))
+    }
+
     data class DraftState(
         val title: String,
         val notes: String,
