@@ -452,12 +452,13 @@ class BoardViewModel(
         val priorityLabel: String,
     )
 
-    val showProtectedReview = MutableStateFlow(false)
+    private val _showProtectedReview = MutableStateFlow(false)
+    val showProtectedReview: StateFlow<Boolean> = _showProtectedReview.asStateFlow()
 
-    private val activeTaskCount: StateFlow<Int> =
+    private val activeTaskList: StateFlow<List<SiftTask>> =
         repository.activeTasks
-            .map { tasks -> tasks.count { !it.isDone && !it.isBrainDump } }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+            .map { tasks -> tasks.filter { !it.isDone && !it.isBrainDump } }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val protectedTasks: StateFlow<List<ProtectedTaskEntry>> =
         combine(projection, settings) { proj, s ->
@@ -488,18 +489,20 @@ class BoardViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun openProtectedReview() {
-        showProtectedReview.value = true
+        _showProtectedReview.value = true
     }
 
     fun closeProtectedReview() {
         val s = settings.value
-        val total = activeTaskCount.value
-        val protectedCount = protectedTasks.value.size
+        // Use same source as inflationAlert for a consistent percentage
+        val activeTasks = activeTaskList.value
+        val total = activeTasks.size
+        val protectedCount = activeTasks.count { it.isProtected }
         val percent = if (total > 0) (protectedCount * 100) / total else 0
         if (s != null && percent < s.protectedInflationPercent) {
             postNotification(NotificationVariant.Info(encouragingMessage()))
         }
-        showProtectedReview.value = false
+        _showProtectedReview.value = false
     }
 
     fun unprotectTask(pageId: String) {
