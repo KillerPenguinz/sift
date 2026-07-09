@@ -155,6 +155,7 @@ fun SiftNavHost(navController: NavHostController = rememberNavController()) {
                         popUpTo(navController.graph.id) { inclusive = true }
                     }
                 },
+                boardVm = boardVm,
             )
         }
 

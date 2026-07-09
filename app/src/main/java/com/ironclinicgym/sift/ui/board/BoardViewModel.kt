@@ -393,6 +393,9 @@ class BoardViewModel(
             var lastKind: InflationKind? = null
             inflationAlert.collect { alert ->
                 if (alert == null && lastKind != null) {
+                    if (_inflationDismissed.value.containsValue(true)) {
+                        postNotification(NotificationVariant.Info(encouragingMessage()))
+                    }
                     _inflationDismissed.value = emptyMap()
                 }
                 lastKind = alert?.kind
@@ -402,7 +405,7 @@ class BoardViewModel(
 
     private val ENCOURAGING_MESSAGES = listOf(
         "Nice work clearing those out",
-        "Good job re-prioritizing",
+        "Good job reprioritizing",
         "ASAP is looking cleaner now",
         "That is more like it",
         "Well done",

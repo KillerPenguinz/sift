@@ -98,24 +98,26 @@ fun BoardScreen(
     }
 
     // Post a persistent nudge whenever signal inflation is detected.
-    LaunchedEffect(activeInflationAlert) {
-        val alert = activeInflationAlert ?: return@LaunchedEffect
-        val asapPriorityId = settings?.priorities?.firstOrNull { it.colorKey == "ASAP" }?.id
-        when (alert.kind) {
-            com.ironclinicgym.sift.core.board.InflationKind.ASAP_OVERLOAD -> viewModel.postNotification(
-                NotificationVariant.InflationNudge(
-                    message = "You have ${alert.count} things in ASAP. Want to thin it out?",
-                    actionLabel = "Go to ASAP",
-                    onAction = { asapPriorityId?.let { onOpenPriority(it) } },
+    // Key on kind only (not the full alert) so count changes within the same kind don't re-fire.
+    LaunchedEffect(activeInflationAlert?.kind) {
+        activeInflationAlert?.let { alert ->
+            val asapPriorityId = settings?.priorities?.firstOrNull { it.colorKey == "ASAP" }?.id
+            when (alert.kind) {
+                com.ironclinicgym.sift.core.board.InflationKind.ASAP_OVERLOAD -> viewModel.postNotification(
+                    NotificationVariant.InflationNudge(
+                        message = "You have ${alert.count} things in ASAP. Want to thin it out?",
+                        actionLabel = "Go to ASAP",
+                        onAction = { asapPriorityId?.let { onOpenPriority(it) } },
+                    )
                 )
-            )
-            com.ironclinicgym.sift.core.board.InflationKind.PROTECTED_SATURATION -> viewModel.postNotification(
-                NotificationVariant.InflationNudge(
-                    message = "That is a lot of Protected tasks. Want to review them?",
-                    actionLabel = "Review",
-                    onAction = { viewModel.openProtectedReview() },
+                com.ironclinicgym.sift.core.board.InflationKind.PROTECTED_SATURATION -> viewModel.postNotification(
+                    NotificationVariant.InflationNudge(
+                        message = "That is a lot of Protected tasks. Want to review them?",
+                        actionLabel = "Review",
+                        onAction = { viewModel.openProtectedReview() },
+                    )
                 )
-            )
+            }
         }
     }
 

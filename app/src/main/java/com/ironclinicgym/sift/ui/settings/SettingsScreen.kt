@@ -30,6 +30,7 @@ import androidx.compose.runtime.setValue
 import com.ironclinicgym.sift.auth.AuthRepository
 import com.ironclinicgym.sift.core.board.Landmark
 import com.ironclinicgym.sift.core.board.OneDayLandmarks
+import com.ironclinicgym.sift.ui.board.BoardViewModel
 import com.ironclinicgym.sift.ui.board.CustomizeViewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,6 +62,7 @@ fun SettingsScreen(
     onRemap: () -> Unit,
     onDeveloper: () -> Unit,
     onResetApp: () -> Unit,
+    boardVm: BoardViewModel,
 ) {
     val viewModel = appViewModel { SettingsViewModel(it) }
     val customizeVm = appViewModel { CustomizeViewModel(it) }
@@ -154,7 +156,7 @@ fun SettingsScreen(
                 trailing = {
                     Switch(
                         checked = inflationEnabled,
-                        onCheckedChange = { customizeVm.setSignalInflationEnabled(it) },
+                        onCheckedChange = { boardVm.onSignalInflationMasterToggle(it) },
                     )
                 },
             )

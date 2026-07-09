@@ -244,7 +244,7 @@ fun TopNotificationBar(
                         color = tokens.neutrals.textPrimary.toColor(),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.clickable(onClick = variant.onAction),
+                        modifier = Modifier.clickable(onClick = { variant.onAction(); onDismiss() }),
                     )
                     MaterialSymbol(
                         "close",
