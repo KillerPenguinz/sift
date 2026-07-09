@@ -11,10 +11,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -135,6 +139,41 @@ fun SettingsScreen(
                             onCheckedChange = { customizeVm.setOneDayLandmarkEnabled(name, it) },
                         )
                     },
+                )
+            }
+        }
+
+        val inflationEnabled = boardSettings?.signalInflationEnabled != false
+        SettingsGroup("Signal Inflation") {
+            SettingsRow(
+                title = "Enable nudges",
+                subtitle = if (inflationEnabled) "Notifies you when ASAP or Protected gets crowded" else "Nudges are off",
+                icon = "notifications_active",
+                showDivider = inflationEnabled,
+                onClick = null,
+                trailing = {
+                    Switch(
+                        checked = inflationEnabled,
+                        onCheckedChange = { customizeVm.setSignalInflationEnabled(it) },
+                    )
+                },
+            )
+            if (inflationEnabled) {
+                SettingsNumberRow(
+                    title = "ASAP threshold",
+                    subtitle = "Nudge when ASAP has this many tasks",
+                    icon = "priority_high",
+                    value = boardSettings?.asapInflationThreshold ?: 5,
+                    showDivider = true,
+                    onValueChange = { n -> customizeVm.setAsapInflationThreshold(n) },
+                )
+                SettingsNumberRow(
+                    title = "Protected threshold (%)",
+                    subtitle = "Nudge when this percent of tasks are Protected",
+                    icon = "shield",
+                    value = boardSettings?.protectedInflationPercent ?: 30,
+                    showDivider = false,
+                    onValueChange = { n -> customizeVm.setProtectedInflationPercent(n) },
                 )
             }
         }
@@ -285,4 +324,35 @@ private fun ThemeModeRadio(selected: Boolean) {
     val tokens = SiftTheme.tokens
     val color = if (selected) tokens.neutrals.textPrimary.toColor() else tokens.neutrals.textTertiary.toColor()
     MaterialSymbol(if (selected) "radio_button_checked" else "radio_button_unchecked", color, size = 22.sp)
+}
+
+@Composable
+private fun SettingsNumberRow(
+    title: String,
+    subtitle: String? = null,
+    icon: String? = null,
+    value: Int,
+    showDivider: Boolean = true,
+    onValueChange: (Int) -> Unit,
+) {
+    var text by remember(value) { mutableStateOf(value.toString()) }
+    SettingsRow(
+        title = title,
+        subtitle = subtitle,
+        icon = icon,
+        showDivider = showDivider,
+        onClick = null,
+        trailing = {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { input ->
+                    text = input
+                    input.toIntOrNull()?.let { onValueChange(it) }
+                },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(0.25f),
+            )
+        },
+    )
 }

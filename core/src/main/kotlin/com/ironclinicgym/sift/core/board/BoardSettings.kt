@@ -82,6 +82,12 @@ data class BoardSettings(
     val labelsAvailable: Boolean = false,
     /** Which Landmark groups are visible in the one-day focused view. Defaults to all. */
     val oneDayLandmarksEnabled: Set<String> = Landmark.entries.map { it.name }.toSet(),
+    /** When false the Signal Inflation nudge is suppressed entirely. */
+    val signalInflationEnabled: Boolean = true,
+    /** Number of ASAP tasks that triggers the overload nudge. */
+    val asapInflationThreshold: Int = 5,
+    /** Percentage of total tasks that are Protected before the saturation nudge fires. */
+    val protectedInflationPercent: Int = 30,
 ) {
     fun bucketFor(optionId: String?): BucketView =
         buckets.firstOrNull { it.optionId == optionId } ?: unsetBucket

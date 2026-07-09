@@ -16,6 +16,7 @@ class AppPreferencesDataStore(context: Context) {
 
     private val notionReminderDismissed = booleanPreferencesKey("notion_reminder_dismissed")
     private val themeModeKey = stringPreferencesKey("theme_mode")
+    private val inflationMasterOffShownKey = booleanPreferencesKey("inflation_master_off_shown")
 
     fun notionReminderDismissed(): Flow<Boolean> =
         dataStore.data.map { it[notionReminderDismissed] == true }
@@ -29,6 +30,13 @@ class AppPreferencesDataStore(context: Context) {
 
     suspend fun setThemeMode(mode: String) {
         dataStore.edit { it[themeModeKey] = mode }
+    }
+
+    fun inflationMasterOffShown(): Flow<Boolean> =
+        dataStore.data.map { it[inflationMasterOffShownKey] == true }
+
+    suspend fun setInflationMasterOffShown(shown: Boolean) {
+        dataStore.edit { it[inflationMasterOffShownKey] = shown }
     }
 
     suspend fun clearAll() {

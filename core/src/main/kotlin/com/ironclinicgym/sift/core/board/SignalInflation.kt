@@ -18,7 +18,7 @@ object SignalInflation {
         asapCount: Int,
         totalTasks: Int,
         protectedCount: Int,
-        asapThreshold: Int = 7,
+        asapThreshold: Int = 5,
         protectedPercent: Int = 30,
     ): InflationAlert? {
         if (asapCount >= asapThreshold) {

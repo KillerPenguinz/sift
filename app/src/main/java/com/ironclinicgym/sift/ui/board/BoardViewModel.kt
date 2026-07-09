@@ -43,12 +43,15 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.ironclinicgym.sift.core.board.InflationKind
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -358,20 +361,96 @@ class BoardViewModel(
 
     val inflationAlert: StateFlow<InflationAlert?> =
         combine(settings.filterNotNull(), repository.activeTasks) { s, tasks ->
+            if (!s.signalInflationEnabled) return@combine null
             val active = tasks.filter { !it.isDone && !it.isBrainDump }
             val asapCount = active.count { t ->
                 s.priorities.firstOrNull { it.optionId == t.priorityOptionId }?.colorKey == "ASAP"
             }
             val protectedCount = active.count { it.isProtected }
-            SignalInflation.checkInflation(asapCount, active.size, protectedCount)
+            SignalInflation.checkInflation(
+                asapCount, active.size, protectedCount,
+                asapThreshold = s.asapInflationThreshold,
+                protectedPercent = s.protectedInflationPercent,
+            )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    private val _inflationDismissed = MutableStateFlow(emptyMap<InflationKind, Boolean>())
+
+    val activeInflationAlert: StateFlow<InflationAlert?> = combine(
+        inflationAlert,
+        _inflationDismissed,
+    ) { alert, dismissed ->
+        if (alert != null && dismissed[alert.kind] == true) null else alert
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    fun dismissInflationAlert() {
+        val kind = activeInflationAlert.value?.kind ?: return
+        _inflationDismissed.update { it + (kind to true) }
+    }
+
+    init {
+        viewModelScope.launch {
+            var lastKind: InflationKind? = null
+            inflationAlert.collect { alert ->
+                if (alert == null && lastKind != null) {
+                    _inflationDismissed.value = emptyMap()
+                }
+                lastKind = alert?.kind
+            }
+        }
+    }
+
+    private val ENCOURAGING_MESSAGES = listOf(
+        "Nice work clearing those out",
+        "Good job re-prioritizing",
+        "ASAP is looking cleaner now",
+        "That is more like it",
+        "Well done",
+        "Much more manageable now",
+        "Good call on those",
+        "Nicely done",
+    )
+    private var lastEncouragingMsgIdx = -1
+
+    fun encouragingMessage(): String {
+        var idx: Int
+        do {
+            idx = ENCOURAGING_MESSAGES.indices.random()
+        } while (idx == lastEncouragingMsgIdx && ENCOURAGING_MESSAGES.size > 1)
+        lastEncouragingMsgIdx = idx
+        return ENCOURAGING_MESSAGES[idx]
+    }
+
+    fun updateBoardSettings(s: BoardSettings) {
+        viewModelScope.launch { settingsStore.save(s) }
+    }
+
+    fun onSignalInflationMasterToggle(enabled: Boolean) {
+        viewModelScope.launch {
+            if (!enabled) {
+                val alreadyShown = appPreferences.inflationMasterOffShown().first()
+                if (!alreadyShown) {
+                    postNotification(
+                        NotificationVariant.Info("This helps keep things manageable, but it is your call.")
+                    )
+                    appPreferences.setInflationMasterOffShown(true)
+                }
+            }
+            val current = settings.value ?: return@launch
+            settingsStore.save(current.copy(signalInflationEnabled = enabled))
+        }
+    }
+
+    /** Task 9 will implement the full protected review screen. */
+    fun openProtectedReview() {
+        // placeholder
+    }
 
     fun notifyAdded(priorityName: String, colorKey: String) {
         postNotification(NotificationVariant.ConfirmPlacement(
             priorityName = priorityName,
             priorityIcon = PRIORITY_META.firstOrNull { it.key.name == colorKey }?.icon ?: "label",
             colorKey = colorKey,
-            onChange = ::dismissNotification,
         ))
     }
 

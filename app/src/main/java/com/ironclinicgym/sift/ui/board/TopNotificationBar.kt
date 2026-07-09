@@ -34,7 +34,6 @@ sealed interface NotificationVariant {
         val priorityName: String,
         val priorityIcon: String,
         val colorKey: String,
-        val onChange: () -> Unit,
     ) : NotificationVariant
 
     data class Reversible(
@@ -51,6 +50,12 @@ sealed interface NotificationVariant {
     ) : NotificationVariant
 
     data class Info(val message: String) : NotificationVariant
+
+    data class InflationNudge(
+        val message: String,
+        val actionLabel: String,
+        val onAction: () -> Unit,
+    ) : NotificationVariant
 }
 
 @Composable
@@ -61,9 +66,11 @@ fun TopNotificationBar(
 ) {
     val tokens = SiftTheme.tokens
 
-    LaunchedEffect(variant) {
-        delay(4000L)
-        onDismiss()
+    if (variant !is NotificationVariant.InflationNudge) {
+        LaunchedEffect(variant) {
+            delay(4000L)
+            onDismiss()
+        }
     }
 
     AnimatedVisibility(
@@ -92,13 +99,6 @@ fun TopNotificationBar(
                         fontSize = 14.5.sp,
                         fontWeight = FontWeight.Medium,
                         modifier = Modifier.weight(1f),
-                    )
-                    Text(
-                        "Change?",
-                        color = accent,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.clickable(onClick = variant.onChange),
                     )
                     MaterialSymbol(
                         "close",
@@ -216,6 +216,35 @@ fun TopNotificationBar(
                         fontSize = 14.5.sp,
                         fontWeight = FontWeight.Medium,
                         modifier = Modifier.weight(1f),
+                    )
+                    MaterialSymbol(
+                        "close",
+                        tokens.neutrals.textTertiary.toColor(),
+                        size = 19.sp,
+                        filled = false,
+                        modifier = Modifier.clickable(onClick = onDismiss),
+                    )
+                }
+            }
+
+            is NotificationVariant.InflationNudge -> {
+                NotificationRow(
+                    bg = tokens.neutrals.surfaceRaised.toColor(),
+                    borderColor = tokens.neutrals.border.toColor(),
+                ) {
+                    Text(
+                        variant.message,
+                        color = tokens.neutrals.textPrimary.toColor(),
+                        fontSize = 14.5.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        variant.actionLabel,
+                        color = tokens.neutrals.textPrimary.toColor(),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.clickable(onClick = variant.onAction),
                     )
                     MaterialSymbol(
                         "close",

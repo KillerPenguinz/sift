@@ -72,6 +72,9 @@ class CustomizeViewModel(private val repository: SiftRepository, private val sto
     fun setTimeGating(enabled: Boolean) = edit { it.setTimeGating(enabled) }
     fun setUse24HourTime(enabled: Boolean) = edit { it.setUse24HourTime(enabled) }
     fun setOneDayLandmarkEnabled(name: String, enabled: Boolean) = edit { it.setOneDayLandmarkEnabled(name, enabled) }
+    fun setSignalInflationEnabled(enabled: Boolean) = edit { it.copy(signalInflationEnabled = enabled) }
+    fun setAsapInflationThreshold(value: Int) = edit { it.copy(asapInflationThreshold = value) }
+    fun setProtectedInflationPercent(value: Int) = edit { it.copy(protectedInflationPercent = value) }
     fun setSampleMode(enabled: Boolean) = edit { it.copy(sampleMode = enabled) }
     fun renameBucket(optionId: String?, name: String) = edit { it.renameBucket(optionId, name) }
     fun recolorBucket(optionId: String?, colorKey: String?) = edit { it.recolorBucket(optionId, colorKey) }

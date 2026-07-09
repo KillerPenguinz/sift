@@ -83,6 +83,7 @@ fun BoardScreen(
     val showReminder by viewModel.showNotionReminder.collectAsStateWithLifecycle()
     val redirectPrompt by viewModel.redirectPrompt.collectAsStateWithLifecycle()
     val protectedFriction by viewModel.protectedFriction.collectAsStateWithLifecycle()
+    val activeInflationAlert by viewModel.activeInflationAlert.collectAsStateWithLifecycle()
     val tokens = SiftTheme.tokens
     val insets = WindowInsets.safeDrawing.asPaddingValues()
     var selectedTask by remember { mutableStateOf<Pair<com.ironclinicgym.sift.core.board.ProjectedItem, String>?>(null) }
@@ -94,6 +95,28 @@ fun BoardScreen(
     // One-shot confirmation when arriving from setup.
     LaunchedEffect(fromSetup) {
         if (fromSetup) viewModel.notifySetupComplete()
+    }
+
+    // Post a persistent nudge whenever signal inflation is detected.
+    LaunchedEffect(activeInflationAlert) {
+        val alert = activeInflationAlert ?: return@LaunchedEffect
+        val asapPriorityId = settings?.priorities?.firstOrNull { it.colorKey == "ASAP" }?.id
+        when (alert.kind) {
+            com.ironclinicgym.sift.core.board.InflationKind.ASAP_OVERLOAD -> viewModel.postNotification(
+                NotificationVariant.InflationNudge(
+                    message = "You have ${alert.count} things in ASAP. Want to thin it out?",
+                    actionLabel = "Go to ASAP",
+                    onAction = { asapPriorityId?.let { onOpenPriority(it) } },
+                )
+            )
+            com.ironclinicgym.sift.core.board.InflationKind.PROTECTED_SATURATION -> viewModel.postNotification(
+                NotificationVariant.InflationNudge(
+                    message = "That is a lot of Protected tasks. Want to review them?",
+                    actionLabel = "Review",
+                    onAction = { viewModel.openProtectedReview() },
+                )
+            )
+        }
     }
 
     Surface(Modifier.fillMaxSize(), color = tokens.neutrals.bg.toColor()) {
@@ -202,7 +225,12 @@ fun BoardScreen(
         } else if (currentNotification != null) {
             TopNotificationBar(
                 variant = currentNotification,
-                onDismiss = { viewModel.dismissNotification() },
+                onDismiss = {
+                    viewModel.dismissNotification()
+                    if (currentNotification is NotificationVariant.InflationNudge) {
+                        viewModel.dismissInflationAlert()
+                    }
+                },
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = insets.calculateTopPadding()),
             )
         }
