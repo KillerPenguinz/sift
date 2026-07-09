@@ -109,6 +109,13 @@ fun SiftPagerScreen(
                     showAddTask = true
                 },
                 onTapDump = {
+                    viewModel.pendingDraft = BoardViewModel.DraftState(
+                        title = "",
+                        notes = "",
+                        bucketId = null,
+                        isBrainDump = true,
+                        dateIso = null,
+                    )
                     showMinimizedBar = false
                     showAddTask = true
                 },

@@ -90,7 +90,7 @@ import com.ironclinicgym.sift.core.board.quickDateTomorrow
 
 private enum class WhenPath { DATE, RANGE, BRAIN_DUMP }
 private enum class RoughRange(val label: String, val key: PriorityKey) {
-    SOONISH("Soon-ish", PriorityKey.SOON),
+    SOONISH("Soonish", PriorityKey.SOON),
     LATER("Later", PriorityKey.LATER),
     WHENEVER("Whenever", PriorityKey.ONEDAY),
 }
@@ -768,13 +768,6 @@ fun AddTaskSheetV2(
 private fun hasDate(whenPath: WhenPath?, selectedDate: String?): Boolean =
     whenPath == WhenPath.DATE && selectedDate != null
 
-private fun humanDate(isoDate: String): String {
-    return try {
-        val date = LocalDate.parse(isoDate)
-        val month = date.month.name.take(3).lowercase().replaceFirstChar { it.uppercase() }
-        "$month ${date.dayOfMonth}"
-    } catch (_: Exception) { isoDate }
-}
 
 private data class RepeatChoice2(val label: String, val chipLabel: String, val rrule: String?)
 private val REPEAT_CHOICES = listOf(
