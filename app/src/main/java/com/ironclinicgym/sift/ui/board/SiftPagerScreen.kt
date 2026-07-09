@@ -107,6 +107,17 @@ fun SiftPagerScreen(
             onDismiss = { showAddTask = false; editingTask = null },
         )
     }
+
+    val showProtectedReview by viewModel.showProtectedReview.collectAsStateWithLifecycle()
+    val protectedTasks by viewModel.protectedTasks.collectAsStateWithLifecycle()
+    if (showProtectedReview) {
+        ProtectedReviewScreen(
+            tasks = protectedTasks,
+            onUnprotect = { pageId -> viewModel.unprotectTask(pageId) },
+            onBack = { viewModel.closeProtectedReview() },
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
 }
 
 @Composable

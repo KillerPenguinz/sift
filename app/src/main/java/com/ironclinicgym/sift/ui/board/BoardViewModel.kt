@@ -444,9 +444,68 @@ class BoardViewModel(
         }
     }
 
-    /** Task 9 will implement the full protected review screen. */
+    // ---- Task 9: Protected review screen ----
+
+    data class ProtectedTaskEntry(
+        val item: ProjectedItem,
+        val priorityColorKey: String,
+        val priorityLabel: String,
+    )
+
+    val showProtectedReview = MutableStateFlow(false)
+
+    private val activeTaskCount: StateFlow<Int> =
+        repository.activeTasks
+            .map { tasks -> tasks.count { !it.isDone && !it.isBrainDump } }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
+    val protectedTasks: StateFlow<List<ProtectedTaskEntry>> =
+        combine(projection, settings) { proj, s ->
+            if (proj == null || s == null) return@combine emptyList()
+            val fromPriorities = proj.priorities.flatMap { priority ->
+                priority.items
+                    .filter { it.task.isProtected }
+                    .map { item ->
+                        ProtectedTaskEntry(
+                            item = item,
+                            priorityColorKey = priority.view.colorKey,
+                            priorityLabel = priority.view.displayName,
+                        )
+                    }
+            }
+            val fromPinned = proj.pinnedItems
+                .filter { it.task.isProtected }
+                .map { item ->
+                    val pv = s.priorities.firstOrNull { p -> p.optionId == item.task.priorityOptionId }
+                    ProtectedTaskEntry(
+                        item = item,
+                        priorityColorKey = pv?.colorKey ?: "ASAP",
+                        priorityLabel = pv?.displayName ?: "ASAP",
+                    )
+                }
+            (fromPriorities + fromPinned).distinctBy { it.item.task.pageId }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     fun openProtectedReview() {
-        // placeholder
+        showProtectedReview.value = true
+    }
+
+    fun closeProtectedReview() {
+        val s = settings.value
+        val total = activeTaskCount.value
+        val protectedCount = protectedTasks.value.size
+        val percent = if (total > 0) (protectedCount * 100) / total else 0
+        if (s != null && percent < s.protectedInflationPercent) {
+            postNotification(NotificationVariant.Info(encouragingMessage()))
+        }
+        showProtectedReview.value = false
+    }
+
+    fun unprotectTask(pageId: String) {
+        viewModelScope.launch {
+            upsertLocalField(pageId) { it.copy(isProtected = false) }
+        }
     }
 
     fun notifyAdded(priorityName: String, colorKey: String) {
