@@ -51,7 +51,7 @@ fun SafetyCatchDialog(
             )
         },
         confirmButton = {
-            TextButton(onClick = { onFindBetterSpot(); onDismiss() }) {
+            TextButton(onClick = { onFindBetterSpot() }) {
                 Text("Find it a better spot")
             }
         },

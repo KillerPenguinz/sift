@@ -498,7 +498,7 @@ class BoardViewModel(
     private val activeTaskList: StateFlow<List<SiftTask>> =
         repository.activeTasks
             .map { tasks -> tasks.filter { !it.isDone && !it.isBrainDump } }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+            .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val protectedTasks: StateFlow<List<ProtectedTaskEntry>> =
         combine(projection, settings) { proj, s ->
