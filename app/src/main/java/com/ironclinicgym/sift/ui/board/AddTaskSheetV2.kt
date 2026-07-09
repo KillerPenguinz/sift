@@ -129,7 +129,7 @@ fun AddTaskSheetV2(
         mutableStateOf(parsed)
     }
     var roughRange by remember { mutableStateOf<RoughRange?>(null) }
-    var repeat by remember { mutableStateOf(REPEAT_CHOICES.firstOrNull { it.rrule == existing?.recurrenceRule } ?: REPEAT_CHOICES.first()) }
+    var recurrenceRule by remember { mutableStateOf(existing?.recurrenceRule) }
     var selectedLabels by remember { mutableStateOf(existing?.labels ?: emptyList()) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
@@ -207,7 +207,7 @@ fun AddTaskSheetV2(
                         bucketOptionId = chosenBucket?.optionId,
                         dueIso = resolvedDueIso(),
                         notes = notes.ifBlank { null },
-                        recurrenceRule = repeat.rrule,
+                        recurrenceRule = recurrenceRule,
                         labels = selectedLabels.ifEmpty { null },
                     ),
                 )
@@ -220,7 +220,7 @@ fun AddTaskSheetV2(
                         bucketOptionName = TaskEdits.Field(chosenBucket?.displayName),
                         dueIso = TaskEdits.Field(resolvedDueIso()),
                         notes = TaskEdits.Field(notes.ifBlank { null }),
-                        recurrenceRule = TaskEdits.Field(repeat.rrule),
+                        recurrenceRule = TaskEdits.Field(recurrenceRule),
                         labels = TaskEdits.Field(selectedLabels),
                         priorityOptionId = priorityId,
                         bucketOptionId = chosenBucket?.optionId,
@@ -481,7 +481,7 @@ fun AddTaskSheetV2(
                     }
 
                     // Repeat button
-                    val hasRepeat = repeat.rrule != null
+                    val hasRepeat = recurrenceRule != null
                     Box(
                         Modifier
                             .size(44.dp)
@@ -713,40 +713,13 @@ fun AddTaskSheetV2(
     }
 
     if (showRepeatPicker) {
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { showRepeatPicker = false },
-            confirmButton = {},
-            title = { Text("Repeat", fontWeight = FontWeight.Bold) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    REPEAT_CHOICES.forEach { choice ->
-                        val selected = repeat == choice
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
-                                .clickable { repeat = choice; showRepeatPicker = false }
-                                .padding(vertical = 10.dp, horizontal = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            MaterialSymbol(
-                                "check_circle",
-                                if (selected) todayAccent else tokens.neutrals.textTertiary.toColor(),
-                                size = 20.sp,
-                                filled = selected,
-                            )
-                            Text(
-                                choice.label,
-                                color = tokens.neutrals.textPrimary.toColor(),
-                                fontSize = 15.sp,
-                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                            )
-                        }
-                    }
-                }
+        RecurrenceBuilderSheet(
+            initialRule = recurrenceRule,
+            onConfirm = { rrule, _ ->
+                recurrenceRule = rrule
+                showRepeatPicker = false
             },
-            containerColor = tokens.neutrals.surfaceRaised.toColor(),
+            onDismiss = { showRepeatPicker = false },
         )
     }
 
@@ -757,10 +730,10 @@ fun AddTaskSheetV2(
                 scope.launch {
                     val ok = viewModel.grantRecurrence()
                     showConsent = false
-                    if (ok) submit() else { repeat = REPEAT_CHOICES.first(); error = "Recurring tasks are unavailable for this database." }
+                    if (ok) submit() else { recurrenceRule = null; error = "Recurring tasks are unavailable for this database." }
                 }
             },
-            onDismiss = { showConsent = false; repeat = REPEAT_CHOICES.first() },
+            onDismiss = { showConsent = false; recurrenceRule = null },
         )
     }
 }
@@ -768,15 +741,6 @@ fun AddTaskSheetV2(
 private fun hasDate(whenPath: WhenPath?, selectedDate: String?): Boolean =
     whenPath == WhenPath.DATE && selectedDate != null
 
-
-private data class RepeatChoice2(val label: String, val chipLabel: String, val rrule: String?)
-private val REPEAT_CHOICES = listOf(
-    RepeatChoice2("Does not repeat", "None", null),
-    RepeatChoice2("Every day", "Daily", "FREQ=DAILY"),
-    RepeatChoice2("Every week", "Weekly", "FREQ=WEEKLY"),
-    RepeatChoice2("Every weekday", "Weekdays", "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"),
-    RepeatChoice2("Every month", "Monthly", "FREQ=MONTHLY"),
-)
 
 @Composable
 private fun FieldLabel(text: String) {
