@@ -299,6 +299,18 @@ fun BoardScreen(
             onDismiss = { viewModel.dismissProtectedFriction() },
         )
     }
+
+    val currentSafetyCatch by viewModel.currentSafetyCatch.collectAsStateWithLifecycle()
+    currentSafetyCatch?.let { (task, _) ->
+        SafetyCatchDialog(
+            task = task,
+            onFindBetterSpot = {
+                viewModel.openRedirectPromptForTask(task)
+                viewModel.dismissSafetyCatch()
+            },
+            onDismiss = { viewModel.dismissSafetyCatch() },
+        )
+    }
 }
 
 @Composable

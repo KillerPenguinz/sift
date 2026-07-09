@@ -8,9 +8,11 @@ import com.ironclinicgym.sift.core.board.BoardSettings
 import com.ironclinicgym.sift.core.board.ClockSnapshot
 import com.ironclinicgym.sift.core.board.ProjectedItem
 import com.ironclinicgym.sift.core.board.ProjectedPriority
+import com.ironclinicgym.sift.core.board.SafetyCatchEvaluation
 import com.ironclinicgym.sift.core.board.SampleBoard
 import com.ironclinicgym.sift.core.board.SignalInflation
 import com.ironclinicgym.sift.core.board.InflationAlert
+import com.ironclinicgym.sift.core.board.evaluateSafetyCatch
 import com.ironclinicgym.sift.core.board.formatHourMinute
 import com.ironclinicgym.sift.core.board.projectBoard
 import com.ironclinicgym.sift.core.board.projectBrainDump
@@ -145,6 +147,11 @@ class BoardViewModel(
     private val _refresh = MutableStateFlow<RefreshUi>(RefreshUi.Idle)
     val refresh: StateFlow<RefreshUi> = _refresh.asStateFlow()
 
+    private val _safetyCatchQueue = MutableStateFlow<List<Pair<SiftTask, String>>>(emptyList())
+    val currentSafetyCatch: StateFlow<Pair<SiftTask, String>?> = _safetyCatchQueue
+        .map { it.firstOrNull() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
     /** "Updated at 3:45 PM" from the last successful refresh, or null before any success. */
     val lastUpdatedLabel: StateFlow<String?> =
         repository.lastSyncAt.map { at ->
@@ -181,7 +188,8 @@ class BoardViewModel(
         Log.d("BatteryDebug", "BoardViewModel.refresh() starting")
         _refresh.value = RefreshUi.Refreshing
         viewModelScope.launch {
-            _refresh.value = when (val result = repository.refresh()) {
+            val result = repository.refresh()
+            _refresh.value = when (result) {
                 is RefreshResult.Success -> {
                     postNotification(NotificationVariant.RefreshSuccess)
                     RefreshUi.Idle
@@ -196,7 +204,37 @@ class BoardViewModel(
                     RefreshUi.Error(result.message)
                 }
             }
+            if (result is RefreshResult.Success) {
+                runSafetyCatchEvaluation(repository.activeTasks.first())
+            }
             Log.d("BatteryDebug", "BoardViewModel.refresh() done: ${_refresh.value}")
+        }
+    }
+
+    fun dismissSafetyCatch() {
+        _safetyCatchQueue.update { it.drop(1) }
+    }
+
+    private suspend fun runSafetyCatchEvaluation(tasks: List<SiftTask>) {
+        val todayIso = LocalDate.now().toString()
+        val mappingId = repository.mappingSet.value.active?.id ?: return
+        val states = localStateStore.observe(mappingId).first().associateBy { it.pageId }
+        val evaluation = evaluateSafetyCatch(
+            datedTasks = tasks.filter { it.due != null && !it.isDone && !it.isBrainDump },
+            localStates = states,
+            todayIso = todayIso,
+        )
+        evaluation.toFire.forEach { (task, band) ->
+            val existing = localStateStore.get(task.pageId)
+                ?: TaskLocalState(pageId = task.pageId, mappingId = mappingId)
+            localStateStore.upsert(existing.copy(safetyCatchFiredBand = band))
+        }
+        evaluation.toClear.forEach { pageId ->
+            val existing = localStateStore.get(pageId) ?: return@forEach
+            localStateStore.upsert(existing.copy(safetyCatchFiredBand = null))
+        }
+        if (evaluation.toFire.isNotEmpty()) {
+            _safetyCatchQueue.value = evaluation.toFire
         }
     }
 

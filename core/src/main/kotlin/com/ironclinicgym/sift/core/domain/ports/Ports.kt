@@ -67,6 +67,7 @@ data class TaskLocalState(
     val reviewDateIso: String? = null,
     val rescheduleCount: Int = 0,
     val createdBy: String = "sift",
+    val safetyCatchFiredBand: String? = null,
 )
 
 /**

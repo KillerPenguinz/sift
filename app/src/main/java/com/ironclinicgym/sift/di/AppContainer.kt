@@ -29,6 +29,7 @@ import com.ironclinicgym.sift.data.local.MIGRATION_1_2
 import com.ironclinicgym.sift.data.local.MIGRATION_2_3
 import com.ironclinicgym.sift.data.local.MIGRATION_3_4
 import com.ironclinicgym.sift.data.local.MIGRATION_4_5
+import com.ironclinicgym.sift.data.local.MIGRATION_5_6
 import com.ironclinicgym.sift.data.local.RecurrenceConsentDataStore
 import com.ironclinicgym.sift.data.local.RoomTaskCache
 import com.ironclinicgym.sift.data.local.RoomTaskLocalStateStore
@@ -77,7 +78,7 @@ class AppContainer(context: Context) {
 
     // Local cache (non-sensitive board records only) + Sift-only operational state.
     private val database = Room.databaseBuilder(appContext, SiftDatabase::class.java, "sift.db")
-        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
         .build()
     private val taskCache: TaskCache = RoomTaskCache(database.taskCacheDao())
     val localStateStore: TaskLocalStateStore = RoomTaskLocalStateStore(database.taskLocalStateDao())

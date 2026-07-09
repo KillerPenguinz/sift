@@ -67,7 +67,7 @@ interface TaskCacheDao {
 
 @Database(
     entities = [CachedTaskEntity::class, TaskLocalStateEntity::class],
-    version = 5,
+    version = 6,
     exportSchema = false,
 )
 abstract class SiftDatabase : RoomDatabase() {
@@ -130,6 +130,15 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
 val MIGRATION_4_5 = object : Migration(4, 5) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE task_local_state ADD COLUMN createdBy TEXT NOT NULL DEFAULT 'sift'")
+    }
+}
+
+/** v5 -> v6: Safety catch band tracking — records which urgency band last triggered the prompt. */
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL(
+            "ALTER TABLE task_local_state ADD COLUMN safetyCatchFiredBand TEXT"
+        )
     }
 }
 

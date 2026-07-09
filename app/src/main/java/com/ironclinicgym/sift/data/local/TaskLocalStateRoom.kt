@@ -29,6 +29,7 @@ data class TaskLocalStateEntity(
     val reviewDateIso: String? = null,
     val rescheduleCount: Int = 0,
     val createdBy: String = "sift",
+    val safetyCatchFiredBand: String? = null,
 )
 
 @Dao
@@ -44,6 +45,9 @@ interface TaskLocalStateDao {
 
     @Query("DELETE FROM task_local_state WHERE pageId = :pageId")
     suspend fun delete(pageId: String)
+
+    @Query("UPDATE task_local_state SET safetyCatchFiredBand = :band WHERE pageId = :pageId AND mappingId = :mappingId")
+    suspend fun updateSafetyCatchFiredBand(pageId: String, mappingId: String, band: String?)
 }
 
 /** Adapts the DAO to the core port, converting entity <-> domain. */
@@ -70,6 +74,7 @@ class RoomTaskLocalStateStore(private val dao: TaskLocalStateDao) : TaskLocalSta
         reviewDateIso = reviewDateIso,
         rescheduleCount = rescheduleCount,
         createdBy = createdBy,
+        safetyCatchFiredBand = safetyCatchFiredBand,
     )
 
     private fun TaskLocalStateEntity.toDomain() = TaskLocalState(
@@ -84,5 +89,6 @@ class RoomTaskLocalStateStore(private val dao: TaskLocalStateDao) : TaskLocalSta
         reviewDateIso = reviewDateIso,
         rescheduleCount = rescheduleCount,
         createdBy = createdBy,
+        safetyCatchFiredBand = safetyCatchFiredBand,
     )
 }
