@@ -89,4 +89,92 @@ class SafetyCatchEvaluatorTest {
         )
         assertEquals(2, eval.toFire.size)
     }
+
+    // ---- 12-hour throttle ----
+
+    @Test fun `throttled task is excluded from toFire`() {
+        val now = System.currentTimeMillis()
+        val task = makeTask("p1", "2026-07-08")
+        val states = mapOf(
+            "p1" to TaskLocalState(
+                pageId = "p1",
+                mappingId = "m1",
+                safetyCatchFiredBand = null,
+                lastSafetyCatchShownAt = now - (6 * 3600 * 1000L),
+            )
+        )
+        val eval = evaluateSafetyCatch(
+            datedTasks = listOf(task),
+            localStates = states,
+            todayIso = "2026-07-09",
+            throttleHours = 12,
+            nowMillis = now,
+        )
+        assertTrue(eval.toFire.isEmpty())
+    }
+
+    @Test fun `expired throttle allows fire`() {
+        val now = System.currentTimeMillis()
+        val task = makeTask("p1", "2026-07-08")
+        val states = mapOf(
+            "p1" to TaskLocalState(
+                pageId = "p1",
+                mappingId = "m1",
+                lastSafetyCatchShownAt = now - (13 * 3600 * 1000L),
+            )
+        )
+        val eval = evaluateSafetyCatch(
+            datedTasks = listOf(task),
+            localStates = states,
+            todayIso = "2026-07-09",
+            throttleHours = 12,
+            nowMillis = now,
+        )
+        assertEquals(1, eval.toFire.size)
+    }
+
+    @Test fun `re-fires for an unchanged band once the throttle window elapses`() {
+        // Regression guard for the root cause bug: a task stuck in the same band (still
+        // overdue) must not be suppressed forever after its first, dismissed prompt.
+        val now = System.currentTimeMillis()
+        val task = makeTask("p1", "2026-07-08")
+        val states = mapOf(
+            "p1" to TaskLocalState(
+                pageId = "p1",
+                mappingId = "m1",
+                safetyCatchFiredBand = "asap",
+                lastSafetyCatchShownAt = now - (13 * 3600 * 1000L),
+            )
+        )
+        val eval = evaluateSafetyCatch(
+            datedTasks = listOf(task),
+            localStates = states,
+            todayIso = "2026-07-09",
+            throttleHours = 12,
+            nowMillis = now,
+        )
+        assertEquals(1, eval.toFire.size)
+        assertEquals("asap", eval.toFire[0].second)
+    }
+
+    @Test fun `does not re-fire for an unchanged band within the throttle window`() {
+        val now = System.currentTimeMillis()
+        val task = makeTask("p1", "2026-07-08")
+        val states = mapOf(
+            "p1" to TaskLocalState(
+                pageId = "p1",
+                mappingId = "m1",
+                safetyCatchFiredBand = "asap",
+                lastSafetyCatchShownAt = now - (2 * 3600 * 1000L),
+            )
+        )
+        val eval = evaluateSafetyCatch(
+            datedTasks = listOf(task),
+            localStates = states,
+            todayIso = "2026-07-09",
+            throttleHours = 12,
+            nowMillis = now,
+        )
+        assertTrue(eval.toFire.isEmpty())
+    }
 }

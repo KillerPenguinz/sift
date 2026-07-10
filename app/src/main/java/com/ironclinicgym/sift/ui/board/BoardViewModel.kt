@@ -40,6 +40,7 @@ import com.ironclinicgym.sift.core.theme.PriorityKey
 import com.ironclinicgym.sift.data.repository.SiftRepository
 import com.ironclinicgym.sift.data.repository.SiftRepository.RefreshResult
 import com.ironclinicgym.sift.di.AppContainer
+import com.ironclinicgym.sift.ui.navigation.Routes
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import com.ironclinicgym.sift.core.theme.PRIORITY_META
@@ -243,8 +244,32 @@ class BoardViewModel(
         }
     }
 
-    fun dismissSafetyCatch() {
+    /**
+     * Drops the head of the safety catch queue. When the user dismissed the dialog without
+     * acting ([actedOn] false), the task is still unresolved, so it is also logged as an
+     * actionable notification: a dismissed prompt does not just vanish, it turns into something
+     * revisitable from the notification center. When the user chose to act ("Find it a better
+     * spot", which opens the redirect prompt), no notification is logged.
+     */
+    fun dismissSafetyCatch(actedOn: Boolean = false) {
+        val dismissed = _safetyCatchQueue.value.firstOrNull()
         _safetyCatchQueue.update { it.drop(1) }
+        if (actedOn) return
+        dismissed?.let { (task, _) ->
+            viewModelScope.launch {
+                notificationStore.insert(
+                    SiftNotification(
+                        id = UUID.randomUUID().toString(),
+                        message = "${task.title} needs a better spot.",
+                        icon = "notifications",
+                        tier = NotificationTier.ACTIONABLE,
+                        actionLabel = "Open",
+                        actionRoute = Routes.BOARD,
+                        timestamp = System.currentTimeMillis(),
+                    )
+                )
+            }
+        }
     }
 
     private suspend fun runSafetyCatchEvaluation(tasks: List<SiftTask>) {
@@ -256,14 +281,19 @@ class BoardViewModel(
             localStates = states,
             todayIso = todayIso,
         )
+        val shownAt = System.currentTimeMillis()
         evaluation.toFire.forEach { (task, band) ->
             val existing = localStateStore.get(task.pageId)
                 ?: TaskLocalState(pageId = task.pageId, mappingId = mappingId)
-            localStateStore.upsert(existing.copy(safetyCatchFiredBand = band))
+            localStateStore.upsert(
+                existing.copy(safetyCatchFiredBand = band, lastSafetyCatchShownAt = shownAt)
+            )
         }
         evaluation.toClear.forEach { pageId ->
             val existing = localStateStore.get(pageId) ?: return@forEach
-            localStateStore.upsert(existing.copy(safetyCatchFiredBand = null))
+            localStateStore.upsert(
+                existing.copy(safetyCatchFiredBand = null, lastSafetyCatchShownAt = null)
+            )
         }
         if (evaluation.toFire.isNotEmpty()) {
             _safetyCatchQueue.update { existing ->
@@ -581,6 +611,15 @@ class BoardViewModel(
             val cutoff = System.currentTimeMillis() - 30L * 24 * 3600 * 1000
             notificationStore.deleteExpired(cutoff)
             actionHistoryStore.deleteOlderThan(cutoff)
+        }
+        // Safety catch on app launch, from whatever is already cached: don't wait for a manual
+        // refresh to notice a task that was already overdue when the app was opened. activeTasks
+        // is fed by mappingSet, which is seeded with MappingSet.EMPTY before the real mapping
+        // loads from disk; a plain `.first()` here would grab that transient empty emission and
+        // never evaluate anything, so wait for the first non-empty task list instead.
+        viewModelScope.launch {
+            val tasks = repository.activeTasks.first { it.isNotEmpty() }
+            runSafetyCatchEvaluation(tasks)
         }
         viewModelScope.launch {
             var lastKind: InflationKind? = null

@@ -298,15 +298,27 @@ internal val SUBHEADER_SLOT_HEIGHT = 48.dp
 internal fun SubheaderSlot(
     viewModel: BoardViewModel,
     bottomPadding: Dp,
+    /**
+     * Title of the most recently removed task, used to expand the generic core undo label
+     * ("Task removed") into "Removed [task name]". Only applied when the active token's label is
+     * exactly that generic string, so a stale title from an earlier remove never leaks into an
+     * unrelated move/complete undo bar.
+     */
+    removedTaskTitle: String? = null,
     idleContent: @Composable () -> Unit,
 ) {
     val undoToken by viewModel.undoToken.collectAsStateWithLifecycle()
     val currentQueuedNotification by viewModel.currentNotification.collectAsStateWithLifecycle()
     val displayedNotification = undoToken?.let { token ->
+        val label = if (token.label == "Task removed" && removedTaskTitle != null) {
+            "Removed $removedTaskTitle"
+        } else {
+            token.label
+        }
         BoardViewModel.QueuedNotification(
             id = BoardViewModel.UNDO_BAR_ID,
             variant = NotificationVariant.Reversible(
-                message = token.label,
+                message = label,
                 icon = "swap_horiz",
                 onUndo = { viewModel.undo() },
             ),

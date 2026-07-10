@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -27,7 +28,9 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -37,11 +40,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import com.ironclinicgym.sift.core.board.BoardSettings
+import com.ironclinicgym.sift.core.board.PriorityView
 import com.ironclinicgym.sift.core.board.ProjectedItem
 import com.ironclinicgym.sift.core.board.priorityLabelForTask
 import com.ironclinicgym.sift.core.notion.NotionUrls
@@ -61,8 +66,13 @@ fun TaskDetailSheet(
     onPin: () -> Unit,
     onRemove: () -> Unit,
     onChangeDate: () -> Unit,
-    onChangePriority: () -> Unit,
+    onChangePriority: (PriorityView) -> Unit,
     onDismiss: () -> Unit,
+    /**
+     * True while the host is showing the protected friction dialog. A chip tap that diverts to
+     * friction never applied the move, so the sheet reverts its optimistic chip selection.
+     */
+    frictionActive: Boolean = false,
 ) {
     val tokens = SiftTheme.tokens
     val context = LocalContext.current
@@ -70,6 +80,21 @@ fun TaskDetailSheet(
     val bucketColors = bucketColorsOf(item.bucket.colorKey)
     val todayIso = remember { java.time.LocalDate.now().toString() }
     var expanded by remember { mutableStateOf(false) }
+    // Local pin level so the icon updates immediately: onPin no longer dismisses the sheet, and
+    // the task object passed in won't recompose with the new pin state until the parent's data
+    // refreshes, so the sheet tracks its own optimistic copy of the cycle.
+    var localPinLevel by remember(item.task.pageId) { mutableIntStateOf(item.task.pinLevel) }
+    var showInlinePriority by remember(item.task.pageId) { mutableStateOf(false) }
+    // Local override for which priority chip reads as "selected" in the inline picker, for the
+    // same reason as localPinLevel: item.task won't recompose in place after a move.
+    var localPriorityOptionId by remember(item.task.pageId) { mutableStateOf(item.task.priorityOptionId) }
+    // A chip tap that lands on protected friction never applied the move, so revert the
+    // optimistic selection as soon as the friction dialog appears. If the user then confirms
+    // the dialog, the chip shows the pre-move value until reopen, the same staleness the frozen
+    // task snapshot already has everywhere, and not misleading in a harmful direction.
+    LaunchedEffect(frictionActive) {
+        if (frictionActive) localPriorityOptionId = item.task.priorityOptionId
+    }
     val body by produceState<List<String>?>(initialValue = null, item.task.pageId) {
         value = runCatching { onLoadBody() }.getOrDefault(emptyList())
     }
@@ -109,15 +134,25 @@ fun TaskDetailSheet(
                         .clip(RoundedCornerShape(12.dp))
                         .background(tokens.neutrals.surface.toColor())
                         .border(1.dp, tokens.neutrals.border.toColor(), RoundedCornerShape(12.dp))
-                        .clickable(onClick = onPin),
+                        .clickable {
+                            // Mirror BoardViewModel.pinTask's cycle so the icon updates in place
+                            // even though the sheet stays open and the underlying task snapshot
+                            // does not recompose.
+                            localPinLevel = when {
+                                localPinLevel == 0 -> 1
+                                localPinLevel == 1 && item.task.isRecurring -> 2
+                                else -> 0
+                            }
+                            onPin()
+                        },
                     contentAlignment = Alignment.Center,
                 ) {
                     MaterialSymbol(
                         "push_pin",
-                        if (item.task.isPinned) tokens.neutrals.textPrimary.toColor()
+                        if (localPinLevel > 0) tokens.neutrals.textPrimary.toColor()
                         else tokens.neutrals.textSecondary.toColor(),
                         size = 21.sp,
-                        filled = item.task.isPinned,
+                        filled = localPinLevel > 0,
                     )
                 }
             }
@@ -212,9 +247,64 @@ fun TaskDetailSheet(
             }
             Spacer(Modifier.height(9.dp))
             if (item.task.isDated) {
+                // Dated tasks keep the date redirect behavior; they cannot be dragged or picked
+                // between priorities directly (Phase 3.5 rule).
                 SecondaryActionButton("calendar_today", "Change date", onChangeDate, Modifier.fillMaxWidth())
             } else {
-                SecondaryActionButton("swap_vert", "Change priority", onChangePriority, Modifier.fillMaxWidth())
+                SecondaryActionButton(
+                    "swap_vert",
+                    "Change priority",
+                    { showInlinePriority = !showInlinePriority },
+                    Modifier.fillMaxWidth(),
+                )
+                AnimatedVisibility(visible = showInlinePriority) {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp)
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        settings?.priorities
+                            ?.filter { !it.hidden }
+                            ?.sortedBy { it.order }
+                            ?.forEach { pv ->
+                                val chipColors = priorityColorsOf(pv.colorKey)
+                                val selected = pv.optionId == localPriorityOptionId
+                                Row(
+                                    Modifier
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(chipColors.headerBg.toColor())
+                                        .border(
+                                            if (selected) 2.dp else 1.dp,
+                                            chipColors.accent.toColor(),
+                                            RoundedCornerShape(12.dp),
+                                        )
+                                        .clickable {
+                                            localPriorityOptionId = pv.optionId
+                                            onChangePriority(pv)
+                                            showInlinePriority = false
+                                        }
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                ) {
+                                    MaterialSymbol(
+                                        priorityIconFor(pv.colorKey),
+                                        chipColors.accentText.toColor(),
+                                        size = 16.sp,
+                                        filled = true,
+                                    )
+                                    Text(
+                                        pv.displayName,
+                                        color = chipColors.accentText.toColor(),
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                    )
+                                }
+                            }
+                    }
+                }
             }
 
             // Expandable hint
@@ -227,6 +317,11 @@ fun TaskDetailSheet(
                 Row(
                     Modifier
                         .fillMaxWidth()
+                        .pointerInput(Unit) {
+                            detectVerticalDragGestures { _, dragAmount ->
+                                if (dragAmount < -10f) expanded = true
+                            }
+                        }
                         .clickable { expanded = true }
                         .padding(top = 20.dp),
                     horizontalArrangement = Arrangement.Center,

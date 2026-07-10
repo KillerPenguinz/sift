@@ -61,8 +61,9 @@ fun FocusedPriorityScreen(viewModel: BoardViewModel, priorityId: String, onBack:
     var selected by remember { mutableStateOf<ProjectedItem?>(null) }
     var editing by remember { mutableStateOf<ProjectedItem?>(null) }
     var showAdd by remember { mutableStateOf(false) }
-    var itemForPriorityPicker by remember { mutableStateOf<ProjectedItem?>(null) }
-    var showPriorityPicker by remember { mutableStateOf(false) }
+    // Title of the most recently removed task, shown in the undo bar in place of the generic
+    // core-level label; see the matching note in BoardScreen.kt.
+    var pendingRemoveTitle by remember { mutableStateOf<String?>(null) }
     val currentNotification by viewModel.currentNotification.collectAsStateWithLifecycle()
     val tokens = SiftTheme.tokens
     val topInset = WindowInsets.safeDrawing.asPaddingValues().calculateTopPadding()
@@ -207,9 +208,14 @@ fun FocusedPriorityScreen(viewModel: BoardViewModel, priorityId: String, onBack:
             .padding(horizontal = 16.dp, vertical = 6.dp)
 
         if (currentUndo != null) {
+            val undoLabel = if (currentUndo.label == "Task removed" && pendingRemoveTitle != null) {
+                "Removed $pendingRemoveTitle"
+            } else {
+                currentUndo.label
+            }
             TopNotificationBar(
                 variant = NotificationVariant.Reversible(
-                    message = currentUndo.label,
+                    message = undoLabel,
                     icon = "swap_horiz",
                     onUndo = { viewModel.undo() },
                 ),
@@ -239,36 +245,24 @@ fun FocusedPriorityScreen(viewModel: BoardViewModel, priorityId: String, onBack:
                 onLoadBody = { viewModel.loadPageBody(item.task.pageId) },
                 onEdit = { editing = item; selected = null },
                 onComplete = { viewModel.completeTask(item.task.pageId); selected = null },
-                onPin = { viewModel.pinTask(item.task.pageId); selected = null },
-                onRemove = { viewModel.removeTask(item.task.pageId); selected = null },
+                // Pin cycles in place; the sheet stays open so the user can keep reviewing the task.
+                onPin = { viewModel.pinTask(item.task.pageId) },
+                onRemove = {
+                    pendingRemoveTitle = item.task.title
+                    viewModel.removeTask(item.task.pageId)
+                    selected = null
+                },
                 onChangeDate = {
                     val task = selected?.task ?: return@TaskDetailSheet
                     selected = null
                     viewModel.openRedirectPromptForTask(task)
                 },
-                onChangePriority = {
-                    itemForPriorityPicker = selected
-                    selected = null
-                    showPriorityPicker = true
+                onChangePriority = { pv ->
+                    viewModel.moveTask(item.task.pageId, pv.optionName ?: pv.displayName, pv.optionId)
                 },
                 onDismiss = { selected = null },
+                frictionActive = protectedFriction != null,
             )
-        }
-
-        if (showPriorityPicker) {
-            val pickerItem = itemForPriorityPicker
-            if (pickerItem == null) {
-                showPriorityPicker = false
-            } else {
-                PriorityPickerSheet(
-                    priorities = settings?.priorities ?: emptyList(),
-                    currentPriorityOptionId = pickerItem.task.priorityOptionId,
-                    onSelect = { pv ->
-                        viewModel.moveTask(pickerItem.task.pageId, pv.optionName ?: pv.displayName, pv.optionId)
-                    },
-                    onDismiss = { showPriorityPicker = false; itemForPriorityPicker = null },
-                )
-            }
         }
 
         val activeSettings = settings

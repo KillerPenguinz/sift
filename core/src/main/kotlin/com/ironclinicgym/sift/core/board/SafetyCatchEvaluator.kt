@@ -14,14 +14,28 @@ data class SafetyCatchEvaluation(
  *
  * "asap" band = task is overdue (due < todayIso).
  * "today" band = task is due today (due == todayIso).
- * A task is NOT fired again if safetyCatchFiredBand already equals the current band.
+ *
+ * Firing rule, in two parts:
+ *  - If the task has never been shown before (`lastSafetyCatchShownAt == null`), fall back to
+ *    the classic one-shot-per-band gate: fire only if `safetyCatchFiredBand` does not already
+ *    equal the current band. This covers first-ever evaluation and legacy rows written before
+ *    the throttle timestamp existed.
+ *  - Once a task HAS been shown (a timestamp is on record), the band no longer matters: the
+ *    task is eligible to fire again purely based on elapsed time, at most once per
+ *    [throttleHours] window. This is the fix for the bug where a task stuck in the same band
+ *    (e.g. still overdue) was suppressed forever after its first, dismissed prompt; it now
+ *    re-fires every [throttleHours] as long as it remains imminent.
+ *
  * A task's record is cleared if it is no longer in any imminent band.
  */
 fun evaluateSafetyCatch(
     datedTasks: List<SiftTask>,
     localStates: Map<String, TaskLocalState>,
     todayIso: String,
+    throttleHours: Int = 12,
+    nowMillis: Long = System.currentTimeMillis(),
 ): SafetyCatchEvaluation {
+    val throttleMs = throttleHours * 3_600_000L
     val toFire = mutableListOf<Pair<SiftTask, String>>()
     val toClear = mutableListOf<String>()
 
@@ -32,10 +46,17 @@ fun evaluateSafetyCatch(
             due == todayIso -> "today"
             else -> null
         }
-        val firedBand = localStates[task.pageId]?.safetyCatchFiredBand
+        val state = localStates[task.pageId]
+        val firedBand = state?.safetyCatchFiredBand
+        val lastShown = state?.lastSafetyCatchShownAt
 
         if (currentBand != null) {
-            if (firedBand != currentBand) {
+            val shouldFire = if (lastShown == null) {
+                firedBand != currentBand
+            } else {
+                (nowMillis - lastShown) >= throttleMs
+            }
+            if (shouldFire) {
                 toFire.add(task to currentBand)
             }
         } else if (firedBand != null) {

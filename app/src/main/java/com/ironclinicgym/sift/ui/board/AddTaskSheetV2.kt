@@ -166,7 +166,11 @@ fun AddTaskSheetV2(
 
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
+        // Only the add path auto-focuses the title field; opening the sheet to edit an existing
+        // task should not pop the keyboard, since the user tapped Edit to review, not to retype.
+        if (existing == null) {
+            focusRequester.requestFocus()
+        }
         if (draft != null) viewModel.clearDraft()
     }
 

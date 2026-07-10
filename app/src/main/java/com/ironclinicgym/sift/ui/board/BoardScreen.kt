@@ -92,8 +92,11 @@ fun BoardScreen(
     val tokens = SiftTheme.tokens
     val insets = WindowInsets.safeDrawing.asPaddingValues()
     var selectedTask by remember { mutableStateOf<Pair<com.ironclinicgym.sift.core.board.ProjectedItem, String>?>(null) }
-    var taskForPriorityPicker by remember { mutableStateOf<com.ironclinicgym.sift.core.board.ProjectedItem?>(null) }
-    var showPriorityPicker by remember { mutableStateOf(false) }
+    // Title of the most recently removed task, shown in the undo bar in place of the generic
+    // core-level label. Not cleared explicitly; it is only read when the active undo token's
+    // label is the generic remove label, so a later unrelated undo (move, complete) never
+    // picks up a stale title, and a later remove always overwrites it with the new title first.
+    var pendingRemoveTitle by remember { mutableStateOf<String?>(null) }
 
     // Refresh when the board opens, so data is current without waiting on the background cycle.
     LaunchedEffect(Unit) { viewModel.refresh() }
@@ -159,7 +162,7 @@ fun BoardScreen(
 
             // Sub-header slot: the "Sift Tasks" row when idle, or the current notification when
             // one is queued. The undo bar (if any) takes priority over the queue.
-            SubheaderSlot(viewModel = viewModel, bottomPadding = 14.dp) {
+            SubheaderSlot(viewModel = viewModel, bottomPadding = 14.dp, removedTaskTitle = pendingRemoveTitle) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -232,36 +235,24 @@ fun BoardScreen(
             onLoadBody = { viewModel.loadPageBody(item.task.pageId) },
             onEdit = { onEditTask(item); selectedTask = null },
             onComplete = { viewModel.completeTask(item.task.pageId); selectedTask = null },
-            onPin = { viewModel.pinTask(item.task.pageId); selectedTask = null },
-            onRemove = { viewModel.removeTask(item.task.pageId); selectedTask = null },
+            // Pin cycles in place; the sheet stays open so the user can keep reviewing the task.
+            onPin = { viewModel.pinTask(item.task.pageId) },
+            onRemove = {
+                pendingRemoveTitle = item.task.title
+                viewModel.removeTask(item.task.pageId)
+                selectedTask = null
+            },
             onChangeDate = {
                 val task = selectedTask?.first?.task ?: return@TaskDetailSheet
                 selectedTask = null
                 viewModel.openRedirectPromptForTask(task)
             },
-            onChangePriority = {
-                taskForPriorityPicker = selectedTask?.first
-                selectedTask = null
-                showPriorityPicker = true
+            onChangePriority = { pv ->
+                viewModel.moveTask(item.task.pageId, pv.optionName ?: pv.displayName, pv.optionId)
             },
             onDismiss = { selectedTask = null },
+            frictionActive = protectedFriction != null,
         )
-    }
-
-    if (showPriorityPicker) {
-        val pickerItem = taskForPriorityPicker
-        if (pickerItem == null) {
-            showPriorityPicker = false
-        } else {
-            PriorityPickerSheet(
-                priorities = settings?.priorities ?: emptyList(),
-                currentPriorityOptionId = pickerItem.task.priorityOptionId,
-                onSelect = { pv ->
-                    viewModel.moveTask(pickerItem.task.pageId, pv.optionName ?: pv.displayName, pv.optionId)
-                },
-                onDismiss = { showPriorityPicker = false; taskForPriorityPicker = null },
-            )
-        }
     }
 
     redirectPrompt?.let { prompt ->
@@ -291,7 +282,7 @@ fun BoardScreen(
             task = task,
             onFindBetterSpot = {
                 viewModel.openRedirectPromptForTask(task)
-                viewModel.dismissSafetyCatch()
+                viewModel.dismissSafetyCatch(actedOn = true)
             },
             onDismiss = { viewModel.dismissSafetyCatch() },
         )
