@@ -8,7 +8,9 @@ import com.ironclinicgym.sift.core.domain.OnboardingService
 import com.ironclinicgym.sift.core.domain.RecurrenceSetupService
 import com.ironclinicgym.sift.core.domain.TaskWriteService
 import com.ironclinicgym.sift.core.domain.UndoManager
+import com.ironclinicgym.sift.core.domain.ports.ActionHistoryStore
 import com.ironclinicgym.sift.core.domain.ports.MappingStore
+import com.ironclinicgym.sift.core.domain.ports.NotificationStore
 import com.ironclinicgym.sift.core.domain.ports.RecurrenceConsentStore
 import com.ironclinicgym.sift.core.domain.ports.TaskCache
 import com.ironclinicgym.sift.core.domain.ports.TaskLocalStateStore
@@ -30,7 +32,10 @@ import com.ironclinicgym.sift.data.local.MIGRATION_2_3
 import com.ironclinicgym.sift.data.local.MIGRATION_3_4
 import com.ironclinicgym.sift.data.local.MIGRATION_4_5
 import com.ironclinicgym.sift.data.local.MIGRATION_5_6
+import com.ironclinicgym.sift.data.local.MIGRATION_6_7
 import com.ironclinicgym.sift.data.local.RecurrenceConsentDataStore
+import com.ironclinicgym.sift.data.local.RoomActionHistoryStore
+import com.ironclinicgym.sift.data.local.RoomNotificationStore
 import com.ironclinicgym.sift.data.local.RoomTaskCache
 import com.ironclinicgym.sift.data.local.RoomTaskLocalStateStore
 import com.ironclinicgym.sift.data.local.SiftDatabase
@@ -78,11 +83,13 @@ class AppContainer(context: Context) {
 
     // Local cache (non-sensitive board records only) + Sift-only operational state.
     private val database = Room.databaseBuilder(appContext, SiftDatabase::class.java, "sift.db")
-        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
         .build()
     private val taskCache: TaskCache = RoomTaskCache(database.taskCacheDao())
     val localStateStore: TaskLocalStateStore = RoomTaskLocalStateStore(database.taskLocalStateDao())
     private val taskLocalState: TaskLocalStateStore get() = localStateStore
+    val notificationStore: NotificationStore = RoomNotificationStore(database.notificationDao())
+    val actionHistoryStore: ActionHistoryStore = RoomActionHistoryStore(database.actionHistoryDao())
     // Concrete types kept for the debug reset (clearAll), exposed as ports elsewhere.
     private val recurrenceConsent = RecurrenceConsentDataStore(appContext)
     private val boardSettingsDataStore = BoardSettingsDataStore(appContext)

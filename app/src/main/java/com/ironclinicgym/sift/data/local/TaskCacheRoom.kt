@@ -66,13 +66,15 @@ interface TaskCacheDao {
 }
 
 @Database(
-    entities = [CachedTaskEntity::class, TaskLocalStateEntity::class],
-    version = 6,
+    entities = [CachedTaskEntity::class, TaskLocalStateEntity::class, NotificationEntity::class, ActionHistoryEntity::class],
+    version = 7,
     exportSchema = false,
 )
 abstract class SiftDatabase : RoomDatabase() {
     abstract fun taskCacheDao(): TaskCacheDao
     abstract fun taskLocalStateDao(): TaskLocalStateDao
+    abstract fun notificationDao(): NotificationDao
+    abstract fun actionHistoryDao(): ActionHistoryDao
 }
 
 /**
@@ -139,6 +141,33 @@ val MIGRATION_5_6 = object : Migration(5, 6) {
         database.execSQL(
             "ALTER TABLE task_local_state ADD COLUMN safetyCatchFiredBand TEXT"
         )
+    }
+}
+
+/** v6 -> v7: Notification center, action history, and labels tables. */
+val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `notifications` (" +
+                "`id` TEXT NOT NULL, `message` TEXT NOT NULL, `icon` TEXT NOT NULL, " +
+                "`tier` TEXT NOT NULL, `actionLabel` TEXT, `actionRoute` TEXT, " +
+                "`isRead` INTEGER NOT NULL DEFAULT 0, `timestamp` INTEGER NOT NULL, " +
+                "PRIMARY KEY(`id`))"
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `action_history` (" +
+                "`id` TEXT NOT NULL, `description` TEXT NOT NULL, `taskTitle` TEXT NOT NULL, " +
+                "`taskPageId` TEXT, `timestamp` INTEGER NOT NULL, " +
+                "`canUndo` INTEGER NOT NULL DEFAULT 0, `isSynced` INTEGER NOT NULL DEFAULT 0, " +
+                "PRIMARY KEY(`id`))"
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `labels` (" +
+                "`id` TEXT NOT NULL, `mappingId` TEXT NOT NULL, " +
+                "`name` TEXT NOT NULL, `colorHex` TEXT NOT NULL, `icon` TEXT NOT NULL, " +
+                "PRIMARY KEY(`id`))"
+        )
+        db.execSQL("ALTER TABLE task_local_state ADD COLUMN lastSafetyCatchShownAt INTEGER")
     }
 }
 

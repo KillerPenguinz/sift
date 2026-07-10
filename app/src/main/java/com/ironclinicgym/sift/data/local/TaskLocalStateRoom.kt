@@ -30,6 +30,7 @@ data class TaskLocalStateEntity(
     val rescheduleCount: Int = 0,
     val createdBy: String = "sift",
     val safetyCatchFiredBand: String? = null,
+    val lastSafetyCatchShownAt: Long? = null,
 )
 
 @Dao
@@ -72,6 +73,7 @@ class RoomTaskLocalStateStore(private val dao: TaskLocalStateDao) : TaskLocalSta
         rescheduleCount = rescheduleCount,
         createdBy = createdBy,
         safetyCatchFiredBand = safetyCatchFiredBand,
+        lastSafetyCatchShownAt = lastSafetyCatchShownAt,
     )
 
     private fun TaskLocalStateEntity.toDomain() = TaskLocalState(
@@ -87,5 +89,6 @@ class RoomTaskLocalStateStore(private val dao: TaskLocalStateDao) : TaskLocalSta
         rescheduleCount = rescheduleCount,
         createdBy = createdBy,
         safetyCatchFiredBand = safetyCatchFiredBand,
+        lastSafetyCatchShownAt = lastSafetyCatchShownAt,
     )
 }
