@@ -916,6 +916,9 @@ class BoardViewModel(
             upsertLocalField(pageId) { it.copy(pinLevel = newLevel) }
             val description = if (newLevel > 0) "Pinned task" else "Unpinned task"
             logAction(description, task.title, pageId, canUndo = false)
+            if (newLevel == 2) {
+                postNotification(NotificationVariant.Info("Protected pin applied to all future occurrences."))
+            }
         }
     }
 
