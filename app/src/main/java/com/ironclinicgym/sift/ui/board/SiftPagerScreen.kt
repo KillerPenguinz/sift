@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -169,7 +170,6 @@ private fun SiftTabBar(
         Row(
             Modifier
                 .fillMaxWidth()
-                .padding(bottom = navBarInset)
                 .height(52.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
@@ -177,6 +177,7 @@ private fun SiftTabBar(
             TabItem(icon = "check_circle", label = "Board", selected = selectedIndex == 0, onClick = { onSelect(0) })
             TabItem(icon = "lightbulb", label = "Brain dump", selected = selectedIndex == 1, onClick = { onSelect(1) })
         }
+        Spacer(Modifier.height(navBarInset))
     }
 }
 

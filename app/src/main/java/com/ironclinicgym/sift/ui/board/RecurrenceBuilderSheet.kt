@@ -197,7 +197,7 @@ fun RecurrenceBuilderSheet(
                         .border(1.dp, tokens.neutrals.border.toColor(), CircleShape),
                 ) {
                     MaterialSymbol(
-                        "remove",
+                        "horizontal_rule",
                         if (interval > 1) tokens.neutrals.textPrimary.toColor()
                         else tokens.neutrals.textTertiary.toColor(),
                         size = 18.sp,

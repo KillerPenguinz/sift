@@ -559,6 +559,14 @@ class BoardViewModel(
         ))
     }
 
+    fun notifyAddedBrainDump() {
+        postNotification(NotificationVariant.ConfirmPlacement(
+            priorityName = "Brain dump",
+            priorityIcon = "lightbulb",
+            colorKey = "ONEDAY",
+        ))
+    }
+
     fun notifySetupComplete() {
         postNotification(NotificationVariant.Info("Setup complete. Syncing with Notion."))
     }

@@ -237,10 +237,12 @@ fun AddTaskSheetV2(
                     } else {
                         if (whenPath == WhenPath.BRAIN_DUMP) {
                             viewModel.setBrainDump(result.pageId)
+                            viewModel.notifyAddedBrainDump()
+                        } else {
+                            val colorKey = settings.priorities
+                                .firstOrNull { it.optionId == priorityId }?.colorKey ?: "ASAP"
+                            viewModel.notifyAdded(priorityName ?: "Task", colorKey)
                         }
-                        val colorKey = settings.priorities
-                            .firstOrNull { it.optionId == priorityId }?.colorKey ?: "ASAP"
-                        viewModel.notifyAdded(priorityName ?: "Task", colorKey)
                         title = ""
                         notes = ""
                         onSaved()

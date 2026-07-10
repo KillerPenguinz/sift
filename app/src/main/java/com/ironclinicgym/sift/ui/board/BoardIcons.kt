@@ -45,7 +45,7 @@ private val CODEPOINTS: Map<String, Char> = mapOf(
     // Redesign additions
     "keep" to Char(0xf4e2), "north_east" to Char(0xf1e1), "mic" to Char(0xe029),
     "cloud_off" to Char(0xe167), "calendar_month" to Char(0xebcc), "repeat" to Char(0xe040),
-    "notes" to Char(0xe26c), "remove" to Char(0xe15b),
+    "notes" to Char(0xe26c), "remove" to Char(0xe15b), "horizontal_rule" to Char(0xf108),
 )
 
 /** Icon names offered when the user customizes a bucket. */
