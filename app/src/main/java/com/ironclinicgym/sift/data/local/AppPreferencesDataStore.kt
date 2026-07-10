@@ -17,6 +17,8 @@ class AppPreferencesDataStore(context: Context) {
     private val notionReminderDismissed = booleanPreferencesKey("notion_reminder_dismissed")
     private val themeModeKey = stringPreferencesKey("theme_mode")
     private val inflationMasterOffShownKey = booleanPreferencesKey("inflation_master_off_shown")
+    private val brainDumpSortKey = stringPreferencesKey("brain_dump_sort")
+    private val brainDumpSortAscKey = booleanPreferencesKey("brain_dump_sort_ascending")
 
     fun notionReminderDismissed(): Flow<Boolean> =
         dataStore.data.map { it[notionReminderDismissed] == true }
@@ -37,6 +39,20 @@ class AppPreferencesDataStore(context: Context) {
 
     suspend fun setInflationMasterOffShown(shown: Boolean) {
         dataStore.edit { it[inflationMasterOffShownKey] = shown }
+    }
+
+    fun brainDumpSort(): Flow<String> =
+        dataStore.data.map { it[brainDumpSortKey] ?: "label" }
+
+    suspend fun setBrainDumpSort(sort: String) {
+        dataStore.edit { it[brainDumpSortKey] = sort }
+    }
+
+    fun brainDumpSortAscending(): Flow<Boolean> =
+        dataStore.data.map { it[brainDumpSortAscKey] != false }
+
+    suspend fun setBrainDumpSortAscending(ascending: Boolean) {
+        dataStore.edit { it[brainDumpSortAscKey] = ascending }
     }
 
     suspend fun clearAll() {

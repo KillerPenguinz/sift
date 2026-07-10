@@ -66,8 +66,8 @@ interface TaskCacheDao {
 }
 
 @Database(
-    entities = [CachedTaskEntity::class, TaskLocalStateEntity::class, NotificationEntity::class, ActionHistoryEntity::class],
-    version = 7,
+    entities = [CachedTaskEntity::class, TaskLocalStateEntity::class, NotificationEntity::class, ActionHistoryEntity::class, LabelEntity::class],
+    version = 8,
     exportSchema = false,
 )
 abstract class SiftDatabase : RoomDatabase() {
@@ -75,6 +75,7 @@ abstract class SiftDatabase : RoomDatabase() {
     abstract fun taskLocalStateDao(): TaskLocalStateDao
     abstract fun notificationDao(): NotificationDao
     abstract fun actionHistoryDao(): ActionHistoryDao
+    abstract fun labelDao(): LabelDao
 }
 
 /**
@@ -168,6 +169,14 @@ val MIGRATION_6_7 = object : Migration(6, 7) {
                 "PRIMARY KEY(`id`))"
         )
         db.execSQL("ALTER TABLE task_local_state ADD COLUMN lastSafetyCatchShownAt INTEGER")
+    }
+}
+
+/** v7 -> v8: Adds labelId and lastModifiedAt columns to task_local_state for the labels system. */
+val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE task_local_state ADD COLUMN labelId TEXT")
+        db.execSQL("ALTER TABLE task_local_state ADD COLUMN lastModifiedAt INTEGER")
     }
 }
 

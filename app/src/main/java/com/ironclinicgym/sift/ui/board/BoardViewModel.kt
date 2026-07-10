@@ -30,8 +30,10 @@ import com.ironclinicgym.sift.core.domain.TaskEdits
 import com.ironclinicgym.sift.core.domain.UndoManager
 import com.ironclinicgym.sift.core.domain.UndoToken
 import com.ironclinicgym.sift.core.domain.WriteResult
+import com.ironclinicgym.sift.core.domain.SiftLabel
 import com.ironclinicgym.sift.core.domain.ports.ActionHistoryStore
 import com.ironclinicgym.sift.core.domain.ports.BoardSettingsStore
+import com.ironclinicgym.sift.core.domain.ports.LabelStore
 import com.ironclinicgym.sift.core.domain.ports.NotificationStore
 import com.ironclinicgym.sift.core.domain.ports.TaskLocalState
 import com.ironclinicgym.sift.core.domain.ports.TaskLocalStateStore
@@ -84,6 +86,7 @@ class BoardViewModel(
     private val localStateStore: TaskLocalStateStore,
     private val notificationStore: NotificationStore,
     private val actionHistoryStore: ActionHistoryStore,
+    private val labelStore: LabelStore,
 ) : ViewModel() {
 
     constructor(container: AppContainer) : this(
@@ -96,6 +99,7 @@ class BoardViewModel(
         container.localStateStore,
         container.notificationStore,
         container.actionHistoryStore,
+        container.labelStore,
     )
 
     private val writeService get() = repository.writeService
@@ -165,6 +169,107 @@ class BoardViewModel(
         repository.activeTasks.map { tasks ->
             tasks.flatMap { it.labels }.distinct().sorted()
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    // ---- Labels system ----
+
+    val siftLabels: StateFlow<List<SiftLabel>> =
+        activeMapping.flatMapLatest { mapping ->
+            if (mapping == null) flowOf(emptyList())
+            else labelStore.observe(mapping.id)
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun createLabel(name: String, colorHex: String, icon: String) {
+        viewModelScope.launch {
+            val mappingId = repository.mappingSet.value.active?.id ?: return@launch
+            labelStore.insert(
+                SiftLabel(
+                    id = UUID.randomUUID().toString(),
+                    mappingId = mappingId,
+                    name = name,
+                    colorHex = colorHex,
+                    icon = icon,
+                )
+            )
+        }
+    }
+
+    fun updateLabel(label: SiftLabel) {
+        viewModelScope.launch { labelStore.update(label) }
+    }
+
+    fun deleteLabel(id: String) {
+        viewModelScope.launch { labelStore.delete(id) }
+    }
+
+    fun assignLabel(pageId: String, labelId: String?) {
+        viewModelScope.launch {
+            upsertLocalField(pageId) { it.copy(labelId = labelId) }
+        }
+    }
+
+    /** Map of pageId to labelId from local states, for brain dump label display. */
+    val localStateLabelMap: StateFlow<Map<String, String?>> =
+        activeMapping.flatMapLatest { mapping ->
+            if (mapping == null) flowOf(emptyMap())
+            else localStateStore.observe(mapping.id).map { states ->
+                states.associate { it.pageId to it.labelId }
+            }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    // ---- Brain dump sorting ----
+
+    enum class BrainDumpSort { LABEL, CREATED, MODIFIED }
+
+    private val _brainDumpSort = MutableStateFlow(BrainDumpSort.LABEL)
+    val brainDumpSort: StateFlow<BrainDumpSort> = _brainDumpSort.asStateFlow()
+
+    private val _brainDumpSortAscending = MutableStateFlow(true)
+    val brainDumpSortAscending: StateFlow<Boolean> = _brainDumpSortAscending.asStateFlow()
+
+    fun cycleBrainDumpSort() {
+        val next = when (_brainDumpSort.value) {
+            BrainDumpSort.LABEL -> BrainDumpSort.CREATED
+            BrainDumpSort.CREATED -> BrainDumpSort.MODIFIED
+            BrainDumpSort.MODIFIED -> BrainDumpSort.LABEL
+        }
+        _brainDumpSort.value = next
+        viewModelScope.launch { appPreferences.setBrainDumpSort(next.name.lowercase()) }
+    }
+
+    fun toggleBrainDumpSortDirection() {
+        val next = !_brainDumpSortAscending.value
+        _brainDumpSortAscending.value = next
+        viewModelScope.launch { appPreferences.setBrainDumpSortAscending(next) }
+    }
+
+    /** Map of pageId to full TaskLocalState, for brain dump sort-by-modified and detail display. */
+    val localStatesMap: StateFlow<Map<String, TaskLocalState>> =
+        activeMapping.flatMapLatest { mapping ->
+            if (mapping == null) flowOf(emptyMap())
+            else localStateStore.observe(mapping.id).map { states ->
+                states.associateBy { it.pageId }
+            }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    fun promoteBrainDump(pageId: String) {
+        viewModelScope.launch {
+            val title = findBrainDumpTask(pageId)?.title.orEmpty()
+            upsertLocalField(pageId) { it.copy(isBrainDump = false) }
+            logAction("Promoted to board", title, pageId)
+        }
+    }
+
+    fun promoteBrainDumpWithDate(pageId: String, dateIso: String) {
+        viewModelScope.launch {
+            val title = findBrainDumpTask(pageId)?.title.orEmpty()
+            upsertLocalField(pageId) { it.copy(isBrainDump = false) }
+            writeService.edit(pageId, TaskEdits(dueIso = TaskEdits.Field(dateIso)))
+            logAction("Promoted to board with date", title, pageId)
+        }
+    }
+
+    private fun findBrainDumpTask(pageId: String): SiftTask? =
+        brainDumpItems.value.firstOrNull { it.task.pageId == pageId }?.task
 
     val boardLabel: StateFlow<String> = activeMapping
         .map { it?.label.orEmpty() }
@@ -612,6 +717,13 @@ class BoardViewModel(
             notificationStore.deleteExpired(cutoff)
             actionHistoryStore.deleteOlderThan(cutoff)
         }
+        // Restore persisted brain dump sort preference.
+        viewModelScope.launch {
+            val saved = appPreferences.brainDumpSort().first()
+            _brainDumpSort.value = runCatching { BrainDumpSort.valueOf(saved.uppercase()) }
+                .getOrDefault(BrainDumpSort.LABEL)
+            _brainDumpSortAscending.value = appPreferences.brainDumpSortAscending().first()
+        }
         // Safety catch on app launch, from whatever is already cached: don't wait for a manual
         // refresh to notice a task that was already overdue when the app was opened. activeTasks
         // is fed by mappingSet, which is seeded with MappingSet.EMPTY before the real mapping
@@ -830,7 +942,7 @@ class BoardViewModel(
     private suspend fun upsertLocalField(pageId: String, transform: (TaskLocalState) -> TaskLocalState) {
         val mappingId = repository.mappingSet.value.active?.id ?: return
         val current = localStateStore.get(pageId) ?: TaskLocalState(pageId = pageId, mappingId = mappingId)
-        localStateStore.upsert(transform(current))
+        localStateStore.upsert(transform(current).copy(lastModifiedAt = System.currentTimeMillis()))
     }
 
     private fun findTask(pageId: String): SiftTask? =

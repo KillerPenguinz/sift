@@ -55,6 +55,7 @@ fun SiftPagerScreen(
     var showAddTask by remember { mutableStateOf(false) }
     var editingTask by remember { mutableStateOf<ProjectedItem?>(null) }
     var showMinimizedBar by remember { mutableStateOf(false) }
+    var selectedBrainDumpItem by remember { mutableStateOf<ProjectedItem?>(null) }
 
     Box(Modifier.fillMaxSize().background(tokens.neutrals.bg.toColor())) {
         HorizontalPager(
@@ -71,7 +72,7 @@ fun SiftPagerScreen(
                 )
                 1 -> BrainDumpScreen(
                     viewModel = viewModel,
-                    onTap = {},
+                    onTap = { item -> selectedBrainDumpItem = item },
                     onOpenMenu = onOpenMenu,
                 )
             }
@@ -148,6 +149,14 @@ fun SiftPagerScreen(
             onUnprotect = { pageId -> viewModel.unprotectTask(pageId) },
             onBack = { viewModel.closeProtectedReview() },
             modifier = Modifier.fillMaxSize(),
+        )
+    }
+
+    selectedBrainDumpItem?.let { item ->
+        BrainDumpDetailSheet(
+            item = item,
+            viewModel = viewModel,
+            onDismiss = { selectedBrainDumpItem = null },
         )
     }
 }

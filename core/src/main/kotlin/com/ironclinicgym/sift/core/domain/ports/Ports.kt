@@ -69,6 +69,8 @@ data class TaskLocalState(
     val createdBy: String = "sift",
     val safetyCatchFiredBand: String? = null,
     val lastSafetyCatchShownAt: Long? = null,
+    val labelId: String? = null,
+    val lastModifiedAt: Long? = null,
 )
 
 /**
