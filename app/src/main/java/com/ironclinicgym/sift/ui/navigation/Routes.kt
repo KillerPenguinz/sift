@@ -16,4 +16,7 @@ object Routes {
     const val SETTINGS = "settings"
     const val CUSTOMIZE = "customize"
     const val DEVELOPER = "developer"
+    const val MENU_HUB = "menu_hub"
+    const val NOTIFICATION_CENTER = "notification_center"
+    const val ACTION_HISTORY = "action_history"
 }

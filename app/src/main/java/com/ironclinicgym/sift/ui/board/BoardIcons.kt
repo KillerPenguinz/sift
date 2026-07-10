@@ -46,6 +46,10 @@ private val CODEPOINTS: Map<String, Char> = mapOf(
     "keep" to Char(0xf4e2), "north_east" to Char(0xf1e1), "mic" to Char(0xe029),
     "cloud_off" to Char(0xe167), "calendar_month" to Char(0xebcc), "repeat" to Char(0xe040),
     "notes" to Char(0xe26c), "remove" to Char(0xe15b), "horizontal_rule" to Char(0xf108),
+    // Menu hub additions
+    "menu" to Char(0xe5d2), "history" to Char(0xe889), "shield" to Char(0xe9e0),
+    "sort" to Char(0xe164), "arrow_upward" to Char(0xe5d8), "arrow_downward" to Char(0xe5db),
+    "sell" to Char(0xf05b),
 )
 
 /** Icon names offered when the user customizes a bucket. */

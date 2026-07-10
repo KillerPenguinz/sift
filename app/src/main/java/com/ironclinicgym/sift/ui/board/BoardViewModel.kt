@@ -28,6 +28,7 @@ import com.ironclinicgym.sift.core.domain.UndoManager
 import com.ironclinicgym.sift.core.domain.UndoToken
 import com.ironclinicgym.sift.core.domain.WriteResult
 import com.ironclinicgym.sift.core.domain.ports.BoardSettingsStore
+import com.ironclinicgym.sift.core.domain.ports.NotificationStore
 import com.ironclinicgym.sift.core.domain.ports.TaskLocalState
 import com.ironclinicgym.sift.core.domain.ports.TaskLocalStateStore
 import com.ironclinicgym.sift.core.mapping.DatabaseMapping
@@ -74,6 +75,7 @@ class BoardViewModel(
     private val appPreferences: AppPreferencesDataStore,
     private val twoAxisPolicy: TwoAxisPolicy,
     private val localStateStore: TaskLocalStateStore,
+    private val notificationStore: NotificationStore,
 ) : ViewModel() {
 
     constructor(container: AppContainer) : this(
@@ -84,6 +86,7 @@ class BoardViewModel(
         container.appPreferences,
         TwoAxisPolicy(),
         container.localStateStore,
+        container.notificationStore,
     )
 
     private val writeService get() = repository.writeService
@@ -119,6 +122,15 @@ class BoardViewModel(
 
     fun dismissNotionReminder() {
         viewModelScope.launch { appPreferences.dismissNotionReminder() }
+    }
+
+    /** Count of unread actionable notifications, shown as a badge on the menu hub icon. */
+    val unreadNotificationCount: StateFlow<Int> =
+        notificationStore.observeUnreadCount()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
+    fun markNotificationsRead() {
+        viewModelScope.launch { notificationStore.markAllRead() }
     }
 
     val settings: StateFlow<BoardSettings?> = activeMapping

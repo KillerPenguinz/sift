@@ -40,7 +40,7 @@ import com.ironclinicgym.sift.ui.theme.toColor
 fun BrainDumpScreen(
     viewModel: BoardViewModel,
     onTap: (ProjectedItem) -> Unit,
-    onSettings: () -> Unit = {},
+    onOpenMenu: () -> Unit = {},
 ) {
     val tokens = SiftTheme.tokens
     val items by viewModel.brainDumpItems.collectAsStateWithLifecycle()
@@ -61,9 +61,8 @@ fun BrainDumpScreen(
                 Box(Modifier.size(40.dp).clickable { viewModel.refresh() }, contentAlignment = Alignment.Center) {
                     MaterialSymbol("refresh", tokens.neutrals.textSecondary.toColor(), size = 22.sp, filled = false)
                 }
-                Box(Modifier.size(40.dp).clickable { onSettings() }, contentAlignment = Alignment.Center) {
-                    MaterialSymbol("settings", tokens.neutrals.textSecondary.toColor(), size = 22.sp, filled = true)
-                }
+                val unreadNotifications by viewModel.unreadNotificationCount.collectAsStateWithLifecycle()
+                MenuIconWithBadge(showBadge = unreadNotifications > 0, onClick = onOpenMenu)
             }
         }
 

@@ -9,7 +9,6 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -71,7 +70,7 @@ fun BoardScreen(
     viewModel: BoardViewModel,
     fromSetup: Boolean = false,
     onOpenPriority: (String) -> Unit,
-    onSettings: () -> Unit,
+    onOpenMenu: () -> Unit,
     onEditTask: (com.ironclinicgym.sift.core.board.ProjectedItem) -> Unit = {},
 ) {
     val projection by viewModel.projection.collectAsStateWithLifecycle()
@@ -147,7 +146,8 @@ fun BoardScreen(
                         spinning = refresh == BoardViewModel.RefreshUi.Refreshing,
                         timeLabel = lastUpdated,
                     ) { viewModel.refresh() }
-                    ControlIcon("settings", filled = true) { onSettings() }
+                    val unreadNotifications by viewModel.unreadNotificationCount.collectAsStateWithLifecycle()
+                    MenuIconWithBadge(showBadge = unreadNotifications > 0, onClick = onOpenMenu)
                 }
             }
 
@@ -310,79 +310,6 @@ fun BoardScreen(
             },
             onDismiss = { viewModel.dismissSafetyCatch() },
         )
-    }
-}
-
-@Composable
-internal fun MinimizedCaptureBar(
-    modifier: Modifier = Modifier,
-    onTapTask: () -> Unit,
-    onTapDump: () -> Unit,
-) {
-    val tokens = SiftTheme.tokens
-    Row(
-        modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .background(tokens.neutrals.surfaceRaised.toColor())
-            .border(1.dp, tokens.neutrals.border.toColor(), RoundedCornerShape(20.dp))
-            .clickable(onClick = onTapTask)
-            .padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Text(
-            "What needs doing?",
-            color = tokens.neutrals.textTertiary.toColor(),
-            fontSize = 16.sp,
-            modifier = Modifier.weight(1f),
-        )
-        SegmentedToggle(isTask = true, onTask = onTapTask, onDump = onTapDump)
-    }
-}
-
-@Composable
-private fun SegmentedToggle(
-    isTask: Boolean,
-    onTask: () -> Unit,
-    onDump: () -> Unit,
-) {
-    val tokens = SiftTheme.tokens
-    Row(
-        Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(tokens.neutrals.surface.toColor())
-            .border(1.dp, tokens.neutrals.border.toColor(), RoundedCornerShape(12.dp))
-            .padding(3.dp),
-    ) {
-        val taskBg = if (isTask) tokens.neutrals.textPrimary.toColor() else androidx.compose.ui.graphics.Color.Transparent
-        val taskFg = if (isTask) tokens.neutrals.bg.toColor() else tokens.neutrals.textTertiary.toColor()
-        val dumpBg = if (!isTask) tokens.neutrals.textPrimary.toColor() else androidx.compose.ui.graphics.Color.Transparent
-        val dumpFg = if (!isTask) tokens.neutrals.bg.toColor() else tokens.neutrals.textTertiary.toColor()
-        Row(
-            Modifier
-                .clip(RoundedCornerShape(9.dp))
-                .background(taskBg)
-                .clickable(onClick = onTask)
-                .padding(horizontal = 11.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
-        ) {
-            MaterialSymbol("check_circle", taskFg, size = 15.sp, filled = isTask)
-            Text("Task", color = taskFg, fontSize = 13.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
-        }
-        Row(
-            Modifier
-                .clip(RoundedCornerShape(9.dp))
-                .background(dumpBg)
-                .clickable(onClick = onDump)
-                .padding(horizontal = 11.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
-        ) {
-            MaterialSymbol("lightbulb", dumpFg, size = 15.sp, filled = !isTask)
-            Text("Dump", color = dumpFg, fontSize = 13.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
-        }
     }
 }
 
