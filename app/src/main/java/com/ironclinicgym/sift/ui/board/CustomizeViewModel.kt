@@ -17,6 +17,7 @@ import com.ironclinicgym.sift.core.board.renameBucket
 import com.ironclinicgym.sift.core.board.setBucketIcon
 import com.ironclinicgym.sift.core.board.setBucketSchedule
 import com.ironclinicgym.sift.core.board.setOneDayLandmarkEnabled
+import com.ironclinicgym.sift.core.board.setSingleColumnLimit
 import com.ironclinicgym.sift.core.board.setTimeGating
 import com.ironclinicgym.sift.core.board.setUse24HourTime
 import com.ironclinicgym.sift.core.board.showPriority
@@ -71,6 +72,7 @@ class CustomizeViewModel(private val repository: SiftRepository, private val sto
     fun removePriority(id: String) = edit { it.removePriority(id) }
     fun setTimeGating(enabled: Boolean) = edit { it.setTimeGating(enabled) }
     fun setUse24HourTime(enabled: Boolean) = edit { it.setUse24HourTime(enabled) }
+    fun setSingleColumnLimit(limit: Int) = edit { it.setSingleColumnLimit(limit) }
     fun setOneDayLandmarkEnabled(name: String, enabled: Boolean) = edit { it.setOneDayLandmarkEnabled(name, enabled) }
     fun setSignalInflationEnabled(enabled: Boolean) = edit { it.copy(signalInflationEnabled = enabled) }
     fun setAsapInflationThreshold(value: Int) = edit { it.copy(asapInflationThreshold = value) }

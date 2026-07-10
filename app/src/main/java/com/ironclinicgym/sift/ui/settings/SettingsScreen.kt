@@ -3,6 +3,7 @@ package com.ironclinicgym.sift.ui.settings
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,14 +11,19 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -108,8 +114,18 @@ fun SettingsScreen(
                 title = "Customize board",
                 subtitle = "Priorities, buckets, and schedules",
                 icon = "tune",
-                showDivider = false,
+                showDivider = true,
                 onClick = onCustomize,
+            )
+            SettingsStepperRow(
+                title = "Tasks per bucket (single column)",
+                subtitle = "How many tasks show before plus N more. Two column view keeps its own limit.",
+                icon = "format_list_numbered",
+                value = boardSettings?.singleColumnLimit ?: 8,
+                minValue = 4,
+                maxValue = 20,
+                showDivider = false,
+                onValueChange = { n -> customizeVm.setSingleColumnLimit(n) },
             )
         }
 
@@ -326,6 +342,62 @@ private fun ThemeModeRadio(selected: Boolean) {
     val tokens = SiftTheme.tokens
     val color = if (selected) tokens.neutrals.textPrimary.toColor() else tokens.neutrals.textTertiary.toColor()
     MaterialSymbol(if (selected) "radio_button_checked" else "radio_button_unchecked", color, size = 22.sp)
+}
+
+/**
+ * A titled row with a decrement/increment stepper that cycles through [minValue]..[maxValue] and
+ * then wraps to "All" (the 0 sentinel), and back. Used for the single column task limit, where
+ * the setting is a bounded range plus one special "no limit" state rather than free text entry.
+ */
+@Composable
+private fun SettingsStepperRow(
+    title: String,
+    subtitle: String? = null,
+    icon: String? = null,
+    value: Int,
+    minValue: Int,
+    maxValue: Int,
+    showDivider: Boolean = true,
+    onValueChange: (Int) -> Unit,
+) {
+    val steps = remember(minValue, maxValue) { (minValue..maxValue).toList() + listOf(0) }
+    val index = steps.indexOf(value).let { if (it < 0) 0 else it }
+    val display = if (value <= 0) "All" else value.toString()
+    SettingsRow(
+        title = title,
+        subtitle = subtitle,
+        icon = icon,
+        showDivider = showDivider,
+        onClick = null,
+        trailing = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                StepperButton("remove") { onValueChange(steps[(index - 1 + steps.size) % steps.size]) }
+                Text(
+                    display,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = SiftTheme.tokens.neutrals.textPrimary.toColor(),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.width(36.dp),
+                )
+                StepperButton("add") { onValueChange(steps[(index + 1) % steps.size]) }
+            }
+        },
+    )
+}
+
+@Composable
+private fun StepperButton(icon: String, onClick: () -> Unit) {
+    val tokens = SiftTheme.tokens
+    Box(
+        Modifier
+            .size(32.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(tokens.neutrals.border.toColor())
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        MaterialSymbol(icon, tokens.neutrals.textSecondary.toColor(), size = 18.sp)
+    }
 }
 
 @Composable

@@ -81,6 +81,9 @@ fun BoardSettings.setTimeGating(enabled: Boolean): BoardSettings = copy(timeGati
 
 fun BoardSettings.setUse24HourTime(enabled: Boolean): BoardSettings = copy(use24HourTime = enabled)
 
+/** Set the single column per bucket task limit. Pass 0 for "Show all" (no cap). */
+fun BoardSettings.setSingleColumnLimit(limit: Int): BoardSettings = copy(singleColumnLimit = limit)
+
 fun BoardSettings.setOneDayLandmarkEnabled(name: String, enabled: Boolean): BoardSettings {
     val updated = if (enabled) oneDayLandmarksEnabled + name else oneDayLandmarksEnabled - name
     return copy(oneDayLandmarksEnabled = updated)
@@ -109,3 +112,6 @@ fun unmappedOptions(mapping: DatabaseMapping, settings: BoardSettings): List<Pri
 
 /** A sensible default accent for a newly added priority, cycling the urgency palette. */
 fun BoardSettings.nextColorKey(): String = PRIORITY_META[priorities.size % PRIORITY_META.size].key.name
+
+/** Resolves [BoardSettings.singleColumnLimit] to an actual row cap, mapping the "Show all" sentinel (0) to no cap. */
+fun BoardSettings.resolvedSingleColumnLimit(): Int = if (singleColumnLimit <= 0) Int.MAX_VALUE else singleColumnLimit

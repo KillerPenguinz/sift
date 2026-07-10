@@ -73,6 +73,13 @@ data class BoardSettings(
     val minimized: Boolean = false,
     /** Layout toggle: 2 column at a glance vs 1 column fuller rows. */
     val twoColumn: Boolean = true,
+    /**
+     * How many tasks a bucket shows in single column view before "plus N more". Two column view
+     * keeps its own fixed cap regardless of this value. Range is 4 to 20; 0 is the sentinel for
+     * "Show all" (no cap). Default 8 for existing users on upgrade, since the field is absent
+     * from previously saved JSON and decodes to this default.
+     */
+    val singleColumnLimit: Int = 8,
     /** Global opt-in for time gating. Defaults off so nothing hides for a new user. */
     val timeGatingEnabled: Boolean = false,
     /** Clock format for times shown in the board and schedule editor. Default is AM/PM. */

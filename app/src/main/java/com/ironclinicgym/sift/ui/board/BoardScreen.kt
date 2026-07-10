@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
 import com.ironclinicgym.sift.core.board.ProjectedPriority
+import com.ironclinicgym.sift.core.board.resolvedSingleColumnLimit
 import com.ironclinicgym.sift.core.domain.SupportUrls
 import com.ironclinicgym.sift.core.theme.PRIORITY_META
 import com.ironclinicgym.sift.ui.common.SiftWordmark
@@ -181,32 +182,36 @@ fun BoardScreen(
                 )
             }
 
-            projection?.pinnedItems?.let { pinned ->
-                if (pinned.isNotEmpty()) {
-                    PinnedSection(
-                        items = pinned,
-                        onTap = { item -> selectedTask = item to "Pinned" },
-                    )
-                }
-            }
-
             val board = projection
             when {
                 board == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-                board.priorities.isEmpty() -> EmptyBoard()
+                board.priorities.isEmpty() && board.pinnedItems.isEmpty() -> EmptyBoard()
                 else -> {
                     val twoCol = board.twoColumn
+                    val singleColumnLimit = settings?.resolvedSingleColumnLimit() ?: ROWS_ONE_COLUMN
+                    val maxRows = if (twoCol) ROWS_TWO_COLUMN else singleColumnLimit
+                    val pinned = board.pinnedItems
                     LazyVerticalStaggeredGrid(
                         columns = StaggeredGridCells.Fixed(if (twoCol) 2 else 1),
                         contentPadding = PaddingValues(16.dp, 4.dp, 16.dp, 80.dp),
                         verticalItemSpacing = 12.dp,
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
+                        if (pinned.isNotEmpty()) {
+                            item(key = "pinned") {
+                                PinnedBucketCard(
+                                    items = pinned,
+                                    expanded = !twoCol,
+                                    maxRows = maxRows,
+                                    onOpenTask = { selectedTask = it to "Pinned" },
+                                )
+                            }
+                        }
                         items(board.priorities, key = { it.view.id }) { priority: ProjectedPriority ->
                             PriorityCard(
                                 priority = priority,
                                 expanded = !twoCol,
-                                maxRows = if (twoCol) ROWS_TWO_COLUMN else ROWS_ONE_COLUMN,
+                                maxRows = maxRows,
                                 icon = priorityIconFor(priority.view.colorKey),
                                 onOpenPriority = { onOpenPriority(priority.view.id) },
                                 onOpenTask = { selectedTask = it to priority.view.displayName },
