@@ -63,7 +63,7 @@ fun FocusedPriorityScreen(viewModel: BoardViewModel, priorityId: String, onBack:
     var showAdd by remember { mutableStateOf(false) }
     var itemForPriorityPicker by remember { mutableStateOf<ProjectedItem?>(null) }
     var showPriorityPicker by remember { mutableStateOf(false) }
-    val activeNotification by viewModel.activeNotification.collectAsStateWithLifecycle()
+    val currentNotification by viewModel.currentNotification.collectAsStateWithLifecycle()
     val tokens = SiftTheme.tokens
     val topInset = WindowInsets.safeDrawing.asPaddingValues().calculateTopPadding()
 
@@ -197,7 +197,14 @@ fun FocusedPriorityScreen(viewModel: BoardViewModel, priorityId: String, onBack:
         }
 
         val currentUndo = undoToken
-        val currentNotification = activeNotification
+        val currentEntry = currentNotification
+
+        // Floating margin: NotificationRow no longer carries its own outer padding (the board
+        // and brain dump subheader slots supply it), so this floating placement adds it here.
+        val floatingModifier = Modifier
+            .align(Alignment.TopCenter)
+            .padding(top = topInset)
+            .padding(horizontal = 16.dp, vertical = 6.dp)
 
         if (currentUndo != null) {
             TopNotificationBar(
@@ -207,13 +214,20 @@ fun FocusedPriorityScreen(viewModel: BoardViewModel, priorityId: String, onBack:
                     onUndo = { viewModel.undo() },
                 ),
                 onDismiss = { viewModel.dismissUndo() },
-                modifier = Modifier.align(Alignment.TopCenter).padding(top = topInset),
+                modifier = floatingModifier,
+                timerKey = BoardViewModel.UNDO_BAR_ID,
             )
-        } else if (currentNotification != null) {
+        } else if (currentEntry != null) {
             TopNotificationBar(
-                variant = currentNotification,
-                onDismiss = { viewModel.dismissNotification() },
-                modifier = Modifier.align(Alignment.TopCenter).padding(top = topInset),
+                variant = currentEntry.variant,
+                onDismiss = {
+                    viewModel.dismissNotification(currentEntry.id)
+                    if (currentEntry.variant is NotificationVariant.InflationNudge) {
+                        viewModel.dismissInflationAlert()
+                    }
+                },
+                modifier = floatingModifier,
+                timerKey = currentEntry.id,
             )
         }
 

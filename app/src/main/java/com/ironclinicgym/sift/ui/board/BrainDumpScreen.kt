@@ -66,39 +66,42 @@ fun BrainDumpScreen(
             }
         }
 
-        // Sub-header
-        Row(
-            Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
+        // Sub-header slot: the "Brain dump" row when idle, or the current notification when one
+        // is queued. The undo bar (if any) takes priority over the queue.
+        SubheaderSlot(viewModel = viewModel, bottomPadding = 16.dp) {
             Row(
+                Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                MaterialSymbol("lightbulb", tokens.neutrals.textSecondary.toColor(), size = 20.sp, filled = true)
-                Text(
-                    "Brain dump",
-                    fontFamily = Bricolage,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 20.sp,
-                    letterSpacing = (-0.01).sp,
-                    color = tokens.neutrals.textPrimary.toColor(),
-                )
-            }
-            if (items.isNotEmpty()) {
-                val countText = if (items.size == 1) "1 thought" else "${items.size} thoughts"
-                Text(
-                    countText,
-                    color = tokens.neutrals.textTertiary.toColor(),
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(50))
-                        .background(tokens.neutrals.surface.toColor())
-                        .border(1.dp, tokens.neutrals.border.toColor(), RoundedCornerShape(50))
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    MaterialSymbol("lightbulb", tokens.neutrals.textSecondary.toColor(), size = 20.sp, filled = true)
+                    Text(
+                        "Brain dump",
+                        fontFamily = Bricolage,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 20.sp,
+                        letterSpacing = (-0.01).sp,
+                        color = tokens.neutrals.textPrimary.toColor(),
+                    )
+                }
+                if (items.isNotEmpty()) {
+                    val countText = if (items.size == 1) "1 thought" else "${items.size} thoughts"
+                    Text(
+                        countText,
+                        color = tokens.neutrals.textTertiary.toColor(),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(tokens.neutrals.surface.toColor())
+                            .border(1.dp, tokens.neutrals.border.toColor(), RoundedCornerShape(50))
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                    )
+                }
             }
         }
 

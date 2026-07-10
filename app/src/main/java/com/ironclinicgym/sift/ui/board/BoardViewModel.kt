@@ -16,8 +16,11 @@ import com.ironclinicgym.sift.core.board.evaluateSafetyCatch
 import com.ironclinicgym.sift.core.board.formatHourMinute
 import com.ironclinicgym.sift.core.board.projectBoard
 import com.ironclinicgym.sift.core.board.projectBrainDump
+import com.ironclinicgym.sift.core.domain.ActionHistoryEntry
+import com.ironclinicgym.sift.core.domain.NotificationTier
 import com.ironclinicgym.sift.core.domain.PolicyDecision
 import com.ironclinicgym.sift.core.domain.RecurrenceSetupService
+import com.ironclinicgym.sift.core.domain.SiftNotification
 import com.ironclinicgym.sift.core.domain.SiftTask
 import com.ironclinicgym.sift.core.domain.TwoAxisPolicy
 import com.ironclinicgym.sift.data.local.AppPreferencesDataStore
@@ -27,6 +30,7 @@ import com.ironclinicgym.sift.core.domain.TaskEdits
 import com.ironclinicgym.sift.core.domain.UndoManager
 import com.ironclinicgym.sift.core.domain.UndoToken
 import com.ironclinicgym.sift.core.domain.WriteResult
+import com.ironclinicgym.sift.core.domain.ports.ActionHistoryStore
 import com.ironclinicgym.sift.core.domain.ports.BoardSettingsStore
 import com.ironclinicgym.sift.core.domain.ports.NotificationStore
 import com.ironclinicgym.sift.core.domain.ports.TaskLocalState
@@ -59,6 +63,8 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
+import java.util.UUID
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Drives the priority grid. Thin over the core: it combines the active mapping, cached tasks,
@@ -76,6 +82,7 @@ class BoardViewModel(
     private val twoAxisPolicy: TwoAxisPolicy,
     private val localStateStore: TaskLocalStateStore,
     private val notificationStore: NotificationStore,
+    private val actionHistoryStore: ActionHistoryStore,
 ) : ViewModel() {
 
     constructor(container: AppContainer) : this(
@@ -87,6 +94,7 @@ class BoardViewModel(
         TwoAxisPolicy(),
         container.localStateStore,
         container.notificationStore,
+        container.actionHistoryStore,
     )
 
     private val writeService get() = repository.writeService
@@ -202,16 +210,15 @@ class BoardViewModel(
         viewModelScope.launch {
             val result = repository.refresh()
             _refresh.value = when (result) {
-                is RefreshResult.Success -> {
-                    postNotification(NotificationVariant.RefreshSuccess)
-                    RefreshUi.Idle
-                }
+                is RefreshResult.Success -> RefreshUi.Idle
                 RefreshResult.NoMapping -> RefreshUi.Idle
                 RefreshResult.NeedsReconnect -> RefreshUi.Reconnect
                 is RefreshResult.Failed -> {
-                    postNotification(NotificationVariant.RefreshError(
+                    // The retry lambda captures this var, assigned once the entry is queued.
+                    var errorEntryId = 0L
+                    errorEntryId = postNotification(NotificationVariant.RefreshError(
                         reason = result.message,
-                        onRetry = { dismissNotification(); refresh() },
+                        onRetry = { dismissNotification(errorEntryId); refresh() },
                     ))
                     RefreshUi.Error(result.message)
                 }
@@ -280,23 +287,112 @@ class BoardViewModel(
     val undoToken: StateFlow<UndoToken?> = undoManager.active
     val flashPageId: StateFlow<String?> = undoManager.flashPageId
 
-    private val _activeNotification = MutableStateFlow<NotificationVariant?>(null)
-    val activeNotification: StateFlow<NotificationVariant?> = _activeNotification.asStateFlow()
+    /**
+     * A queued notification with a monotonic [id] so two structurally equal variants queued back
+     * to back still count as distinct heads: the StateFlow re-emits, and the UI keys its slide
+     * animation and auto-dismiss timer on [id] so both restart per entry.
+     */
+    data class QueuedNotification(val id: Long, val variant: NotificationVariant)
 
-    fun dismissNotification() { _activeNotification.value = null }
+    companion object {
+        /** Stable [QueuedNotification.id] for the undo bar, which lives outside the queue. */
+        const val UNDO_BAR_ID = -1L
+    }
 
-    internal fun postNotification(variant: NotificationVariant) { _activeNotification.value = variant }
+    private val notificationIds = AtomicLong(0)
+    private val _notificationQueue = MutableStateFlow<List<QueuedNotification>>(emptyList())
+
+    /** The single notification to display right now, or null. One at a time; see [postNotification]. */
+    val currentNotification: StateFlow<QueuedNotification?> =
+        _notificationQueue.map { it.firstOrNull() }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /**
+     * Drop the head of the queue, but only if it is still the entry the caller saw ([id]): a
+     * double-fired dismiss (X tapped as the auto-dismiss timer lands) is a no-op instead of
+     * silently swallowing the next queued notification.
+     */
+    fun dismissNotification(id: Long) {
+        _notificationQueue.update { queue ->
+            if (queue.firstOrNull()?.id == id) queue.drop(1) else queue
+        }
+    }
+
+    /**
+     * Enqueue a notification and return its queue entry id. Transient variants (added, removed,
+     * undo, info) are display-only and never persisted. Actionable variants (inflation nudges)
+     * also get a durable [SiftNotification] row so they show up, unread, in the notification
+     * center.
+     */
+    internal fun postNotification(variant: NotificationVariant): Long {
+        val id = notificationIds.incrementAndGet()
+        _notificationQueue.update { it + QueuedNotification(id, variant) }
+        if (variant is NotificationVariant.InflationNudge) {
+            viewModelScope.launch {
+                notificationStore.insert(
+                    SiftNotification(
+                        id = UUID.randomUUID().toString(),
+                        message = variant.message,
+                        icon = "notifications",
+                        tier = NotificationTier.ACTIONABLE,
+                        timestamp = System.currentTimeMillis(),
+                    )
+                )
+            }
+        }
+        return id
+    }
+
+    /** Log a user action (add, complete, remove, move, pin, snooze) to the action history. */
+    private fun logAction(description: String, taskTitle: String, taskPageId: String?, canUndo: Boolean = false) {
+        viewModelScope.launch {
+            actionHistoryStore.insert(
+                ActionHistoryEntry(
+                    id = UUID.randomUUID().toString(),
+                    description = description,
+                    taskTitle = taskTitle,
+                    taskPageId = taskPageId,
+                    timestamp = System.currentTimeMillis(),
+                    canUndo = canUndo,
+                )
+            )
+        }
+    }
 
     /** Add: suspends and returns the result so the sheet can stay open and preserve input on failure. */
-    suspend fun addTask(draft: TaskDraft): WriteResult = writeService.add(draft)
+    suspend fun addTask(draft: TaskDraft): WriteResult {
+        val result = writeService.add(draft)
+        if (result is WriteResult.Success) {
+            logAction("Added task", draft.title, result.pageId, canUndo = result.undo != null)
+        }
+        return result
+    }
 
     /** Edit an existing task's mapped fields. */
     suspend fun editTask(pageId: String, edits: TaskEdits): WriteResult = writeService.edit(pageId, edits)
 
-    fun completeTask(pageId: String) = runAction { writeService.complete(pageId) }
-    fun removeTask(pageId: String) = runAction { writeService.remove(pageId) }
+    fun completeTask(pageId: String) {
+        val title = findTask(pageId)?.title.orEmpty()
+        runAction(logDescription = "Completed task", logTaskTitle = title, logTaskPageId = pageId) {
+            writeService.complete(pageId)
+        }
+    }
+
+    fun removeTask(pageId: String) {
+        val title = findTask(pageId)?.title.orEmpty()
+        runAction(logDescription = "Removed task", logTaskTitle = title, logTaskPageId = pageId) {
+            writeService.remove(pageId)
+        }
+    }
+
     fun moveTask(pageId: String, toName: String, toId: String?) {
-        val task = findTask(pageId) ?: return runAction { writeService.move(pageId, toName, toId) }
+        val task = findTask(pageId)
+        if (task == null) {
+            runAction(logDescription = "Moved to $toName", logTaskTitle = "", logTaskPageId = pageId) {
+                writeService.move(pageId, toName, toId)
+            }
+            return
+        }
         val toPriorityKey = settings.value?.priorities
             ?.firstOrNull { it.optionId == toId }?.let { runCatching { PriorityKey.valueOf(it.colorKey) }.getOrNull() }
         val fromPriorityKey = settings.value?.priorities
@@ -313,7 +409,9 @@ class BoardViewModel(
                 is PolicyDecision.SafetyCatch -> Unit
             }
         }
-        runAction { writeService.move(pageId, toName, toId) }
+        runAction(logDescription = "Moved to $toName", logTaskTitle = task.title, logTaskPageId = pageId) {
+            writeService.move(pageId, toName, toId)
+        }
     }
 
     /** Swipe to snooze: bump one priority (undated) or push the date out a day (dated). */
@@ -326,7 +424,11 @@ class BoardViewModel(
         }
         viewModelScope.launch {
             when (val result = writeService.snooze(task.pageId, snoozeDecisionFor(task, s))) {
-                is WriteResult.Success -> { flash(task.pageId); postNotification(NotificationVariant.Info("Snoozed. Change in the task menu.")) }
+                is WriteResult.Success -> {
+                    flash(task.pageId)
+                    postNotification(NotificationVariant.Info("Snoozed. Change in the task menu."))
+                    logAction("Snoozed task", task.title, task.pageId, canUndo = result.undo != null)
+                }
                 WriteResult.AtLowestPriority -> postNotification(NotificationVariant.Info("This is already the lowest priority."))
                 is WriteResult.Failure -> postNotification(NotificationVariant.Info(result.message))
                 else -> Unit
@@ -374,13 +476,25 @@ class BoardViewModel(
 
     private suspend fun activeMappingNow(): DatabaseMapping? = repository.mappingSet.value.active
 
-    /** Run a write, then surface its undo token, flash, and any error message. */
-    private fun runAction(block: suspend () -> WriteResult) {
+    /**
+     * Run a write, then surface its undo token, flash, and any error message. If [logDescription]
+     * is set, a successful write is also logged to the action history (canUndo reflects whether
+     * the write actually returned an undo token).
+     */
+    private fun runAction(
+        logDescription: String? = null,
+        logTaskTitle: String = "",
+        logTaskPageId: String? = null,
+        block: suspend () -> WriteResult,
+    ) {
         viewModelScope.launch {
             when (val result = block()) {
                 is WriteResult.Success -> {
                     undoManager.offer(result.undo)
                     result.undo?.highlightPageId?.let { flash(it) }
+                    if (logDescription != null) {
+                        logAction(logDescription, logTaskTitle, logTaskPageId ?: result.pageId, canUndo = result.undo != null)
+                    }
                 }
                 is WriteResult.Failure -> postNotification(NotificationVariant.Info(result.message))
                 WriteResult.NeedsRecurrenceConsent -> postNotification(NotificationVariant.Info("Turn on recurring tasks first in the add screen."))
@@ -603,7 +717,10 @@ class BoardViewModel(
 
     fun confirmProtectedAction(pageId: String, toName: String, toId: String?) {
         _protectedFriction.value = null
-        runAction { writeService.move(pageId, toName, toId) }
+        val title = findTask(pageId)?.title.orEmpty()
+        runAction(logDescription = "Moved to $toName", logTaskTitle = title, logTaskPageId = pageId) {
+            writeService.move(pageId, toName, toId)
+        }
     }
 
     fun removeDateAndMoveManual(pageId: String) {
@@ -619,6 +736,8 @@ class BoardViewModel(
                 else -> 0
             }
             upsertLocalField(pageId) { it.copy(pinLevel = newLevel) }
+            val description = if (newLevel > 0) "Pinned task" else "Unpinned task"
+            logAction(description, task.title, pageId, canUndo = false)
         }
     }
 

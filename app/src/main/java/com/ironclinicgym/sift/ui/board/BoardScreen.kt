@@ -3,7 +3,9 @@ package com.ironclinicgym.sift.ui.board
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -25,6 +27,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -39,8 +42,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -50,6 +55,7 @@ import com.ironclinicgym.sift.core.board.ProjectedPriority
 import com.ironclinicgym.sift.core.domain.SupportUrls
 import com.ironclinicgym.sift.core.theme.PRIORITY_META
 import com.ironclinicgym.sift.ui.common.SiftWordmark
+import com.ironclinicgym.sift.ui.theme.Bricolage
 import com.ironclinicgym.sift.ui.theme.SiftTheme
 import com.ironclinicgym.sift.ui.theme.toColor
 
@@ -78,7 +84,6 @@ fun BoardScreen(
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val refresh by viewModel.refresh.collectAsStateWithLifecycle()
     val lastUpdated by viewModel.lastUpdatedLabel.collectAsStateWithLifecycle()
-    val undoToken by viewModel.undoToken.collectAsStateWithLifecycle()
     val showReminder by viewModel.showNotionReminder.collectAsStateWithLifecycle()
     val redirectPrompt by viewModel.redirectPrompt.collectAsStateWithLifecycle()
     val protectedFriction by viewModel.protectedFriction.collectAsStateWithLifecycle()
@@ -151,21 +156,23 @@ fun BoardScreen(
                 }
             }
 
-            // Sub-header
-            Row(
-                Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                MaterialSymbol("check_circle", tokens.neutrals.textSecondary.toColor(), size = 20.sp, filled = true)
-                Text(
-                    "Sift Tasks",
-                    fontFamily = com.ironclinicgym.sift.ui.theme.Bricolage,
-                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
-                    fontSize = 20.sp,
-                    letterSpacing = (-0.01).sp,
-                    color = tokens.neutrals.textPrimary.toColor(),
-                )
+            // Sub-header slot: the "Sift Tasks" row when idle, or the current notification when
+            // one is queued. The undo bar (if any) takes priority over the queue.
+            SubheaderSlot(viewModel = viewModel, bottomPadding = 14.dp) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    MaterialSymbol("check_circle", tokens.neutrals.textSecondary.toColor(), size = 20.sp, filled = true)
+                    Text(
+                        "Sift Tasks",
+                        fontFamily = Bricolage,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 20.sp,
+                        letterSpacing = (-0.01).sp,
+                        color = tokens.neutrals.textPrimary.toColor(),
+                    )
+                }
             }
 
             AnimatedVisibility(visible = showReminder) {
@@ -208,33 +215,6 @@ fun BoardScreen(
                     }
                 }
             }
-        }
-
-        val activeNotification by viewModel.activeNotification.collectAsStateWithLifecycle()
-        val currentUndo = undoToken
-        val currentNotification = activeNotification
-
-        if (currentUndo != null) {
-            TopNotificationBar(
-                variant = NotificationVariant.Reversible(
-                    message = currentUndo.label,
-                    icon = "swap_horiz",
-                    onUndo = { viewModel.undo() },
-                ),
-                onDismiss = { viewModel.dismissUndo() },
-                modifier = Modifier.align(Alignment.TopCenter).padding(top = insets.calculateTopPadding()),
-            )
-        } else if (currentNotification != null) {
-            TopNotificationBar(
-                variant = currentNotification,
-                onDismiss = {
-                    viewModel.dismissNotification()
-                    if (currentNotification is NotificationVariant.InflationNudge) {
-                        viewModel.dismissInflationAlert()
-                    }
-                },
-                modifier = Modifier.align(Alignment.TopCenter).padding(top = insets.calculateTopPadding()),
-            )
         }
       }
     }
@@ -323,6 +303,11 @@ private fun ControlIcon(name: String, filled: Boolean = false, onClick: () -> Un
     }
 }
 
+/**
+ * The refresh control: a spinning icon while syncing, plus a status label. During sync the
+ * label area shows three bouncing dots; when done, it crossfades to the "updated Xm ago" text.
+ * No banner is posted for a successful sync, this indicator is the only signal.
+ */
 @Composable
 private fun RefreshIcon(spinning: Boolean, timeLabel: String?, onClick: () -> Unit) {
     val tokens = SiftTheme.tokens
@@ -343,7 +328,7 @@ private fun RefreshIcon(spinning: Boolean, timeLabel: String?, onClick: () -> Un
     Row(
         Modifier.clickable(onClick = onClick).padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         MaterialSymbol(
             "refresh",
@@ -352,13 +337,43 @@ private fun RefreshIcon(spinning: Boolean, timeLabel: String?, onClick: () -> Un
             modifier = spinModifier,
             filled = false,
         )
-        if (!spinning && timeLabel != null) {
-            Text(
-                timeLabel,
-                color = tokens.neutrals.textTertiary.toColor(),
-                fontSize = 12.5.sp,
-                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
-                style = androidx.compose.ui.text.TextStyle(fontFeatureSettings = "tnum"),
+        Crossfade(targetState = spinning, animationSpec = tween(200), label = "syncStatus") { isSpinning ->
+            if (isSpinning) {
+                BouncingDots(color = tokens.neutrals.textTertiary.toColor())
+            } else if (timeLabel != null) {
+                Text(
+                    timeLabel,
+                    color = tokens.neutrals.textTertiary.toColor(),
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    style = androidx.compose.ui.text.TextStyle(fontFeatureSettings = "tnum"),
+                )
+            }
+        }
+    }
+}
+
+/** Three dots bouncing in sequence, shown in place of the timestamp while a sync is in flight. */
+@Composable
+private fun BouncingDots(color: Color) {
+    val transition = rememberInfiniteTransition(label = "dots")
+    Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+        repeat(3) { index ->
+            val offset by transition.animateFloat(
+                initialValue = 0f,
+                targetValue = -4f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(400, delayMillis = index * 133, easing = LinearEasing),
+                    repeatMode = RepeatMode.Reverse,
+                ),
+                label = "dot$index",
+            )
+            Box(
+                Modifier
+                    .size(4.dp)
+                    .graphicsLayer { translationY = offset }
+                    .clip(CircleShape)
+                    .background(color),
             )
         }
     }
