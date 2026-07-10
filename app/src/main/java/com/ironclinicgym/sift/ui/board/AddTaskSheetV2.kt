@@ -30,11 +30,6 @@ import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberTimePickerState
-import android.app.Activity
-import android.content.Intent
-import android.speech.RecognizerIntent
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -150,14 +145,6 @@ fun AddTaskSheetV2(
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
         if (draft != null) viewModel.clearDraft()
-    }
-
-    val speechLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.let { spoken ->
-                title = if (title.isBlank()) spoken else "$title $spoken"
-            }
-        }
     }
 
     fun resolvedDueIso(): String? {
@@ -311,14 +298,10 @@ fun AddTaskSheetV2(
                     },
                 )
                 Spacer(Modifier.width(10.dp))
-                MaterialSymbol(
-                    "mic", tokens.neutrals.textTertiary.toColor(), size = 20.sp, filled = false,
-                    modifier = Modifier.clickable {
-                        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                        }
-                        runCatching { speechLauncher.launch(intent) }
-                    },
+                MicButton(
+                    currentText = { title },
+                    onTextChange = { title = it },
+                    size = 20.sp,
                 )
             }
 
@@ -637,6 +620,12 @@ fun AddTaskSheetV2(
                             }
                             inner()
                         },
+                    )
+                    MicButton(
+                        currentText = { notes },
+                        onTextChange = { notes = it },
+                        size = 18.sp,
+                        modifier = Modifier.padding(top = 1.dp),
                     )
                 }
             }
