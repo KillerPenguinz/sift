@@ -3,6 +3,7 @@ package com.ironclinicgym.sift.ui.board
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,6 +38,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,6 +51,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -77,7 +81,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import com.ironclinicgym.sift.core.board.formatHourMinute
-import com.ironclinicgym.sift.core.board.formatOrdinalDate
 import com.ironclinicgym.sift.core.board.quickDateLaterToday
 import com.ironclinicgym.sift.core.board.quickDateNextMonth
 import com.ironclinicgym.sift.core.board.quickDateNextWeek
@@ -88,6 +91,26 @@ private enum class RoughRange(val label: String, val key: PriorityKey) {
     SOONISH("Soonish", PriorityKey.SOON),
     LATER("Later", PriorityKey.LATER),
     WHENEVER("Whenever", PriorityKey.ONEDAY),
+}
+
+// Recurrence cycling constants
+private val RECURRENCE_CYCLE = listOf(null, "FREQ=DAILY", "FREQ=WEEKLY", "FREQ=MONTHLY", "FREQ=YEARLY")
+private val RECURRENCE_LABELS = mapOf(
+    "FREQ=DAILY" to "Daily",
+    "FREQ=WEEKLY" to "Weekly",
+    "FREQ=MONTHLY" to "Monthly",
+    "FREQ=YEARLY" to "Yearly",
+)
+
+// Helper to format date in short form (e.g., "Jul 16")
+private fun formatShortDate(isoDate: String): String {
+    return try {
+        val date = LocalDate.parse(isoDate)
+        val month = date.month.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault())
+        "$month ${date.dayOfMonth}"
+    } catch (_: Exception) {
+        isoDate
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -336,25 +359,30 @@ fun AddTaskSheetV2(
                 Spacer(Modifier.height(18.dp))
             }
 
-            // Compact bucket chips
+            // Compact bucket chips with scaling based on count
             if (buckets.isNotEmpty() && whenPath != WhenPath.BRAIN_DUMP) {
                 FieldLabel("Bucket")
                 Spacer(Modifier.height(9.dp))
+                val scrollable = buckets.size > 4
+                val rowModifier = if (scrollable) Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+                    else Modifier.fillMaxWidth()
                 Row(
-                    Modifier.fillMaxWidth(),
+                    rowModifier,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.Top,
                 ) {
                     buckets.forEach { b ->
                         val colors = bucketColorsOf(b.colorKey)
                         val sel = b.optionId == bucketId
+                        val iconSize = if (scrollable) 36.dp else 48.dp
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.clickable { bucketId = b.optionId },
+                            modifier = (if (!scrollable) Modifier.weight(1f) else Modifier)
+                                .clickable { bucketId = b.optionId },
                         ) {
                             Box(
                                 Modifier
-                                    .size(36.dp)
+                                    .size(iconSize)
                                     .clip(androidx.compose.foundation.shape.CircleShape)
                                     .background(colors.bg.toColor())
                                     .then(
@@ -363,7 +391,7 @@ fun AddTaskSheetV2(
                                     ),
                                 contentAlignment = Alignment.Center,
                             ) {
-                                MaterialSymbol(b.icon, colors.onColor.toColor(), size = 18.sp, filled = true)
+                                MaterialSymbol(b.icon, colors.onColor.toColor(), size = (iconSize.value * 0.5f).sp, filled = true)
                             }
                             if (sel) {
                                 Text(
@@ -420,10 +448,13 @@ fun AddTaskSheetV2(
                             filled = hasDate,
                         )
                         Text(
-                            if (hasDate) formatOrdinalDate(selectedDate!!) else "Date",
+                            if (hasDate) formatShortDate(selectedDate!!) else "Date",
                             color = if (hasDate) todayAccent else tokens.neutrals.textSecondary.toColor(),
                             fontSize = 13.5.sp,
                             fontWeight = if (hasDate) FontWeight.SemiBold else FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.widthIn(max = 80.dp),
                         )
                         if (hasDate) {
                             Spacer(Modifier.weight(1f))
@@ -465,29 +496,57 @@ fun AddTaskSheetV2(
                         )
                     }
 
-                    // Repeat button
-                    val hasRepeat = recurrenceRule != null
-                    Box(
-                        Modifier
-                            .size(44.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .then(
-                                if (hasRepeat) Modifier
-                                    .background(todayAccent.copy(alpha = 0.16f))
-                                    .border(1.5.dp, todayAccent, RoundedCornerShape(12.dp))
-                                else Modifier
-                                    .background(tokens.neutrals.surface.toColor())
-                                    .border(1.dp, tokens.neutrals.border.toColor(), RoundedCornerShape(12.dp))
+                    // Recurrence button with tap-to-cycle and long-press detail
+                    @OptIn(ExperimentalFoundationApi::class)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        val hasRepeat = recurrenceRule != null
+                        val dateGated = hasDate(whenPath, selectedDate)
+                        Box(
+                            Modifier
+                                .size(44.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .then(
+                                    if (hasRepeat) Modifier
+                                        .background(todayAccent.copy(alpha = 0.16f))
+                                        .border(1.5.dp, todayAccent, RoundedCornerShape(12.dp))
+                                    else Modifier
+                                        .background(tokens.neutrals.surface.toColor())
+                                        .border(1.dp, tokens.neutrals.border.toColor(), RoundedCornerShape(12.dp))
+                                )
+                                .combinedClickable(
+                                    enabled = dateGated,
+                                    onClick = {
+                                        // Tap to cycle through recurrence presets
+                                        val currentIdx = RECURRENCE_CYCLE.indexOf(recurrenceRule)
+                                        val nextIdx = (currentIdx + 1) % RECURRENCE_CYCLE.size
+                                        recurrenceRule = RECURRENCE_CYCLE[nextIdx]
+                                    },
+                                    onLongClick = {
+                                        // Long-press to open detail sheet
+                                        if (dateGated) showRepeatPicker = true
+                                    },
+                                ),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            MaterialSymbol(
+                                "repeat",
+                                if (hasRepeat) todayAccent else tokens.neutrals.textSecondary.toColor(),
+                                size = 20.sp,
+                                filled = hasRepeat,
                             )
-                            .clickable(enabled = hasDate(whenPath, selectedDate)) { showRepeatPicker = true },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        MaterialSymbol(
-                            "repeat",
-                            if (hasRepeat) todayAccent else tokens.neutrals.textSecondary.toColor(),
-                            size = 20.sp,
-                            filled = hasRepeat,
-                        )
+                        }
+                        // Custom rules from the long-press builder (e.g. FREQ=WEEKLY;INTERVAL=2)
+                        // are not in RECURRENCE_LABELS; show "Custom" so the state stays visible.
+                        val label = recurrenceRule?.let { RECURRENCE_LABELS[it] ?: "Custom" }
+                        if (label != null) {
+                            Text(
+                                label,
+                                color = tokens.neutrals.textTertiary.toColor(),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.padding(top = 2.dp),
+                            )
+                        }
                     }
                 }
 
@@ -527,20 +586,6 @@ fun AddTaskSheetV2(
                             selectedDate = nmDate
                             time = nmTime
                             whenPath = WhenPath.DATE
-                        }
-                        Box(
-                            Modifier
-                                .size(36.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(tokens.neutrals.surface.toColor())
-                                .border(1.dp, tokens.neutrals.border.toColor(), RoundedCornerShape(10.dp))
-                                .clickable {
-                                    whenPath = WhenPath.DATE
-                                    showDatePicker = true
-                                },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            MaterialSymbol("calendar_month", tokens.neutrals.textSecondary.toColor(), size = 18.sp, filled = false)
                         }
                     }
                 }
