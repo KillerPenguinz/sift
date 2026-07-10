@@ -43,8 +43,8 @@ private val CODEPOINTS: Map<String, Char> = mapOf(
     "push_pin" to Char(0xf10d), "open_in_new" to Char(0xe89e), "notifications" to Char(0xe7f4),
     "lightbulb" to Char(0xe0f0), "dashboard" to Char(0xe871),
     // Redesign additions
-    "keep" to Char(0xf4e2), "north_east" to Char(0xf1e1), "mic" to Char(0xe029),
-    "cloud_off" to Char(0xe167), "calendar_month" to Char(0xebcc), "repeat" to Char(0xe040),
+    "keep" to Char(0xe6aa), "north_east" to Char(0xf1e1), "mic" to Char(0xe029),
+    "cloud_off" to Char(0xe2c1), "calendar_month" to Char(0xebcc), "repeat" to Char(0xe040),
     "notes" to Char(0xe26c), "remove" to Char(0xe15b), "horizontal_rule" to Char(0xf108),
     // Menu hub additions
     "menu" to Char(0xe5d2), "history" to Char(0xe889), "shield" to Char(0xe9e0),
