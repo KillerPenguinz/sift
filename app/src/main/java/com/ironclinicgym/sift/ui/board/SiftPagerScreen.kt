@@ -44,7 +44,7 @@ fun SiftPagerScreen(
     viewModel: BoardViewModel,
     fromSetup: Boolean,
     onOpenPriority: (String) -> Unit,
-    onSettings: () -> Unit,
+    onOpenMenu: () -> Unit,
 ) {
     val tokens = SiftTheme.tokens
     val pagerState = rememberPagerState(pageCount = { 2 })
@@ -66,13 +66,13 @@ fun SiftPagerScreen(
                     viewModel = viewModel,
                     fromSetup = fromSetup,
                     onOpenPriority = onOpenPriority,
-                    onSettings = onSettings,
+                    onOpenMenu = onOpenMenu,
                     onEditTask = { item -> editingTask = item },
                 )
                 1 -> BrainDumpScreen(
                     viewModel = viewModel,
                     onTap = {},
-                    onSettings = onSettings,
+                    onOpenMenu = onOpenMenu,
                 )
             }
         }
@@ -99,9 +99,9 @@ fun SiftPagerScreen(
             MaterialSymbol("add", tokens.neutrals.bg.toColor(), size = 28.sp)
         }
 
-        // Minimized capture bar — shown after a successful save
+        // Post-save capture bar — shown after a successful save, invites the next item
         if (showMinimizedBar && !showAddTask) {
-            MinimizedCaptureBar(
+            PostSaveCaptureBar(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 60.dp + navBarInset, start = 16.dp, end = 16.dp),
@@ -120,6 +120,7 @@ fun SiftPagerScreen(
                     showMinimizedBar = false
                     showAddTask = true
                 },
+                onDismissed = { showMinimizedBar = false },
             )
         }
     }
