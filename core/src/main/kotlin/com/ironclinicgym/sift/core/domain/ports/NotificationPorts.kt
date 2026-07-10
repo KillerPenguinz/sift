@@ -18,5 +18,12 @@ interface ActionHistoryStore {
     suspend fun insert(entry: ActionHistoryEntry)
     fun observeRecent(limit: Int = 50): Flow<List<ActionHistoryEntry>>
     suspend fun markSynced(ids: List<String>)
+
+    /** Marks every entry synced. Called after a successful refresh: Notion is authoritative from then on. */
+    suspend fun markAllSynced()
+
+    /** The newest entry still undoable (canUndo and not yet synced), matching the active undo token. */
+    suspend fun mostRecentUndoable(): ActionHistoryEntry?
+
     suspend fun deleteOlderThan(timestamp: Long)
 }

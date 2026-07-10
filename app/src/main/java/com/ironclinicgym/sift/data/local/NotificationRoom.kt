@@ -104,6 +104,12 @@ interface ActionHistoryDao {
     @Query("UPDATE action_history SET isSynced = 1 WHERE id IN (:ids)")
     suspend fun markSynced(ids: List<String>)
 
+    @Query("UPDATE action_history SET isSynced = 1")
+    suspend fun markAllSynced()
+
+    @Query("SELECT * FROM action_history WHERE canUndo = 1 AND isSynced = 0 ORDER BY timestamp DESC LIMIT 1")
+    suspend fun mostRecentUndoable(): ActionHistoryEntity?
+
     @Query("DELETE FROM action_history WHERE timestamp < :timestamp")
     suspend fun deleteOlderThan(timestamp: Long)
 }
@@ -121,6 +127,8 @@ class RoomActionHistoryStore(private val dao: ActionHistoryDao) : ActionHistoryS
         dao.observeRecent(limit).map { list -> list.map { it.toDomain() } }
 
     override suspend fun markSynced(ids: List<String>) = dao.markSynced(ids)
+    override suspend fun markAllSynced() = dao.markAllSynced()
+    override suspend fun mostRecentUndoable(): ActionHistoryEntry? = dao.mostRecentUndoable()?.toDomain()
     override suspend fun deleteOlderThan(timestamp: Long) = dao.deleteOlderThan(timestamp)
 
     private fun ActionHistoryEntry.toEntity() = ActionHistoryEntity(

@@ -141,6 +141,16 @@ class BoardViewModel(
         viewModelScope.launch { notificationStore.markAllRead() }
     }
 
+    /** Chronological (newest first) actionable notifications for the notification center screen. */
+    val notifications: StateFlow<List<SiftNotification>> =
+        notificationStore.observeActionable()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Chronological (newest first) user action log for the action history screen. */
+    val actionHistory: StateFlow<List<ActionHistoryEntry>> =
+        actionHistoryStore.observeRecent(50)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     val settings: StateFlow<BoardSettings?> = activeMapping
         .flatMapLatest { mapping ->
             if (mapping == null) flowOf(null)
@@ -224,6 +234,9 @@ class BoardViewModel(
                 }
             }
             if (result is RefreshResult.Success) {
+                // Notion is authoritative after a successful sync: local undo tokens no longer
+                // match remote state, so retire every history entry's undo availability.
+                actionHistoryStore.markAllSynced()
                 runSafetyCatchEvaluation(repository.activeTasks.first())
             }
             Log.d("BatteryDebug", "BoardViewModel.refresh() done: ${_refresh.value}")
@@ -444,9 +457,17 @@ class BoardViewModel(
         val token = undoManager.take() ?: return
         viewModelScope.launch {
             token.highlightPageId?.let { flash(it) }
+            // The taken token corresponds, by construction, to the newest still-undoable history
+            // entry. Capture it before the inverse runs so a concurrent logAction cannot shift
+            // which entry is "most recent".
+            val historyEntry = actionHistoryStore.mostRecentUndoable()
             when (val result = token.inverse()) {
                 is WriteResult.Failure -> postNotification(NotificationVariant.Info(result.message))
-                else -> Unit
+                else -> {
+                    // Retire the history entry so the action history screen's Undo button does
+                    // not linger after the token has been consumed.
+                    historyEntry?.let { actionHistoryStore.markSynced(listOf(it.id)) }
+                }
             }
         }
     }
@@ -555,6 +576,12 @@ class BoardViewModel(
     }
 
     init {
+        // One-time cleanup: notification center and action history entries expire after 30 days.
+        viewModelScope.launch {
+            val cutoff = System.currentTimeMillis() - 30L * 24 * 3600 * 1000
+            notificationStore.deleteExpired(cutoff)
+            actionHistoryStore.deleteOlderThan(cutoff)
+        }
         viewModelScope.launch {
             var lastKind: InflationKind? = null
             inflationAlert.collect { alert ->

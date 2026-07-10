@@ -1,25 +1,13 @@
 package com.ironclinicgym.sift.ui.navigation
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.size
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -29,9 +17,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -39,12 +24,13 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.ironclinicgym.sift.SiftApp
+import com.ironclinicgym.sift.ui.board.ActionHistoryScreen
 import com.ironclinicgym.sift.ui.board.BoardViewModel
-import com.ironclinicgym.sift.ui.board.MaterialSymbol
 import com.ironclinicgym.sift.ui.board.SiftPagerScreen
 import com.ironclinicgym.sift.ui.board.CustomizeBoardScreen
 import com.ironclinicgym.sift.ui.board.FocusedPriorityScreen
 import com.ironclinicgym.sift.ui.board.MenuHubScreen
+import com.ironclinicgym.sift.ui.board.NotificationCenterScreen
 import com.ironclinicgym.sift.ui.common.appViewModel
 import com.ironclinicgym.sift.ui.onboarding.AutoSetupScreen
 import com.ironclinicgym.sift.ui.onboarding.ByoDatabasePickerScreen
@@ -54,9 +40,6 @@ import com.ironclinicgym.sift.ui.onboarding.OnboardingViewModel
 import com.ironclinicgym.sift.ui.onboarding.SetupChoiceScreen
 import com.ironclinicgym.sift.ui.settings.DeveloperScreen
 import com.ironclinicgym.sift.ui.settings.SettingsScreen
-import com.ironclinicgym.sift.ui.theme.Bricolage
-import com.ironclinicgym.sift.ui.theme.SiftTheme
-import com.ironclinicgym.sift.ui.theme.toColor
 
 /**
  * The Phase 1 navigation graph. A single [OnboardingViewModel] is hoisted here (Activity
@@ -205,57 +188,16 @@ fun SiftNavHost(navController: NavHostController = rememberNavController()) {
             )
         }
 
-        // TODO(Task 5): Replace with NotificationCenterScreen (docs/superpowers/plans/2026-07-09-phase-3-5-round-2.md).
         composable(Routes.NOTIFICATION_CENTER) {
-            ComingSoonScreen(title = "Notifications", onBack = { navController.popBackStack() })
-        }
-
-        // TODO(Task 5): Replace with ActionHistoryScreen (docs/superpowers/plans/2026-07-09-phase-3-5-round-2.md).
-        composable(Routes.ACTION_HISTORY) {
-            ComingSoonScreen(title = "Action History", onBack = { navController.popBackStack() })
-        }
-    }
-}
-
-/**
- * Temporary placeholder for [Routes.NOTIFICATION_CENTER] and [Routes.ACTION_HISTORY].
- * TODO(Task 5): Remove once NotificationCenterScreen and ActionHistoryScreen exist
- * (docs/superpowers/plans/2026-07-09-phase-3-5-round-2.md).
- */
-@Composable
-private fun ComingSoonScreen(title: String, onBack: () -> Unit) {
-    val tokens = SiftTheme.tokens
-    val topInset = WindowInsets.safeDrawing.asPaddingValues().calculateTopPadding()
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(tokens.neutrals.bg.toColor())
-            .padding(top = topInset)
-            .navigationBarsPadding(),
-    ) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                Modifier.size(40.dp).clickable(onClick = onBack),
-                contentAlignment = Alignment.Center,
-            ) {
-                MaterialSymbol("arrow_back", tokens.neutrals.textSecondary.toColor(), size = 22.sp, filled = false)
-            }
-            Text(
-                title,
-                color = tokens.neutrals.textPrimary.toColor(),
-                fontFamily = Bricolage,
-                fontWeight = FontWeight.Bold,
-                fontSize = 20.sp,
-                modifier = Modifier.padding(start = 12.dp),
+            NotificationCenterScreen(
+                viewModel = boardVm,
+                onBack = { navController.popBackStack() },
+                onAction = { route -> navController.navigate(route) },
             )
         }
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("Coming soon.", color = tokens.neutrals.textTertiary.toColor())
+
+        composable(Routes.ACTION_HISTORY) {
+            ActionHistoryScreen(viewModel = boardVm, onBack = { navController.popBackStack() })
         }
     }
 }
