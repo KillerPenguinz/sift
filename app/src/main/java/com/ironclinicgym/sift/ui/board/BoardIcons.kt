@@ -50,6 +50,12 @@ private val CODEPOINTS: Map<String, Char> = mapOf(
     "menu" to Char(0xe5d2), "history" to Char(0xe889), "shield" to Char(0xe9e0),
     "sort" to Char(0xe164), "arrow_upward" to Char(0xe5d8), "arrow_downward" to Char(0xe5db),
     "sell" to Char(0xf05b),
+    // Settings, brain dump, and redirect prompt icons (were falling back to the label glyph)
+    "brightness_auto" to Char(0xe1ab), "calendar_today" to Char(0xe935), "check" to Char(0xe5ca),
+    "dark_mode" to Char(0xe51c), "edit_note" to Char(0xe745), "event_busy" to Char(0xe615),
+    "format_list_numbered" to Char(0xe242), "help" to Char(0xe887), "label_off" to Char(0xe9b6),
+    "light_mode" to Char(0xe518), "notifications_active" to Char(0xe7f7),
+    "priority_high" to Char(0xe645), "restart_alt" to Char(0xf053),
 )
 
 /** Icon names offered when the user customizes a bucket. */
