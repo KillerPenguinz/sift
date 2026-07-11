@@ -3,6 +3,7 @@ package com.ironclinicgym.sift.ui.board
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,11 +31,6 @@ import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberTimePickerState
-import android.app.Activity
-import android.content.Intent
-import android.speech.RecognizerIntent
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -42,6 +38,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -53,6 +51,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -73,13 +72,45 @@ import com.ironclinicgym.sift.ui.theme.toColor
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.ZoneId
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import com.ironclinicgym.sift.core.board.formatHourMinute
+import com.ironclinicgym.sift.core.board.quickDateLaterToday
+import com.ironclinicgym.sift.core.board.quickDateNextMonth
+import com.ironclinicgym.sift.core.board.quickDateNextWeek
+import com.ironclinicgym.sift.core.board.quickDateTomorrow
 
 private enum class WhenPath { DATE, RANGE, BRAIN_DUMP }
 private enum class RoughRange(val label: String, val key: PriorityKey) {
-    SOONISH("Soon-ish", PriorityKey.SOON),
+    SOONISH("Soonish", PriorityKey.SOON),
     LATER("Later", PriorityKey.LATER),
     WHENEVER("Whenever", PriorityKey.ONEDAY),
+}
+
+// Recurrence cycling constants
+private val RECURRENCE_CYCLE = listOf(null, "FREQ=DAILY", "FREQ=WEEKLY", "FREQ=MONTHLY", "FREQ=YEARLY")
+private val RECURRENCE_LABELS = mapOf(
+    "FREQ=DAILY" to "Daily",
+    "FREQ=WEEKLY" to "Weekly",
+    "FREQ=MONTHLY" to "Monthly",
+    "FREQ=YEARLY" to "Yearly",
+)
+
+// Helper to format date in short form (e.g., "Jul 16")
+private fun formatShortDate(isoDate: String): String {
+    return try {
+        val date = LocalDate.parse(isoDate)
+        val month = date.month.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault())
+        "$month ${date.dayOfMonth}"
+    } catch (_: Exception) {
+        isoDate
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -88,6 +119,7 @@ fun AddTaskSheetV2(
     viewModel: BoardViewModel,
     settings: BoardSettings,
     editing: ProjectedItem?,
+    onSaved: () -> Unit = {},
     onDismiss: () -> Unit,
 ) {
     val tokens = SiftTheme.tokens
@@ -101,11 +133,12 @@ fun AddTaskSheetV2(
     var bucketId by remember { mutableStateOf(draft?.bucketId ?: existing?.bucketOptionId) }
     var whenPath by remember { mutableStateOf<WhenPath?>(
         if (draft?.isBrainDump == true) WhenPath.BRAIN_DUMP
+        else if (draft?.dateIso != null) WhenPath.DATE
         else if (existing?.due != null) WhenPath.DATE
         else null
     ) }
     var didSave by remember { mutableStateOf(false) }
-    var selectedDate by remember { mutableStateOf(existing?.due?.take(10)) }
+    var selectedDate by remember { mutableStateOf(draft?.dateIso ?: existing?.due?.take(10)) }
     var time by remember {
         val parsed = existing?.due?.takeIf { "T" in it }?.let { iso ->
             val parts = iso.substringAfter("T").split(":")
@@ -114,7 +147,7 @@ fun AddTaskSheetV2(
         mutableStateOf(parsed)
     }
     var roughRange by remember { mutableStateOf<RoughRange?>(null) }
-    var repeat by remember { mutableStateOf(REPEAT_CHOICES.firstOrNull { it.rrule == existing?.recurrenceRule } ?: REPEAT_CHOICES.first()) }
+    var recurrenceRule by remember { mutableStateOf(existing?.recurrenceRule) }
     var selectedLabels by remember { mutableStateOf(existing?.labels ?: emptyList()) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
@@ -133,16 +166,12 @@ fun AddTaskSheetV2(
 
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
-        if (draft != null) viewModel.clearDraft()
-    }
-
-    val speechLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.let { spoken ->
-                title = if (title.isBlank()) spoken else "$title $spoken"
-            }
+        // Only the add path auto-focuses the title field; opening the sheet to edit an existing
+        // task should not pop the keyboard, since the user tapped Edit to review, not to retype.
+        if (existing == null) {
+            focusRequester.requestFocus()
         }
+        if (draft != null) viewModel.clearDraft()
     }
 
     fun resolvedDueIso(): String? {
@@ -192,7 +221,7 @@ fun AddTaskSheetV2(
                         bucketOptionId = chosenBucket?.optionId,
                         dueIso = resolvedDueIso(),
                         notes = notes.ifBlank { null },
-                        recurrenceRule = repeat.rrule,
+                        recurrenceRule = recurrenceRule,
                         labels = selectedLabels.ifEmpty { null },
                     ),
                 )
@@ -205,7 +234,7 @@ fun AddTaskSheetV2(
                         bucketOptionName = TaskEdits.Field(chosenBucket?.displayName),
                         dueIso = TaskEdits.Field(resolvedDueIso()),
                         notes = TaskEdits.Field(notes.ifBlank { null }),
-                        recurrenceRule = TaskEdits.Field(repeat.rrule),
+                        recurrenceRule = TaskEdits.Field(recurrenceRule),
                         labels = TaskEdits.Field(selectedLabels),
                         priorityOptionId = priorityId,
                         bucketOptionId = chosenBucket?.optionId,
@@ -218,17 +247,19 @@ fun AddTaskSheetV2(
                     didSave = true
                     viewModel.clearDraft()
                     if (existing != null) {
-                        onDismiss()
+                        onSaved()
                     } else {
                         if (whenPath == WhenPath.BRAIN_DUMP) {
                             viewModel.setBrainDump(result.pageId)
+                            viewModel.notifyAddedBrainDump()
+                        } else {
+                            val colorKey = settings.priorities
+                                .firstOrNull { it.optionId == priorityId }?.colorKey ?: "ASAP"
+                            viewModel.notifyAdded(priorityName ?: "Task", colorKey)
                         }
-                        val colorKey = settings.priorities
-                            .firstOrNull { it.optionId == priorityId }?.colorKey ?: "ASAP"
-                        viewModel.notifyAdded(priorityName ?: "Task", colorKey)
                         title = ""
                         notes = ""
-                        onDismiss()
+                        onSaved()
                     }
                 }
                 is WriteResult.Failure -> error = result.message
@@ -246,6 +277,7 @@ fun AddTaskSheetV2(
                     notes = notes,
                     bucketId = bucketId,
                     isBrainDump = whenPath == WhenPath.BRAIN_DUMP,
+                    dateIso = selectedDate,
                 )
             }
             onDismiss()
@@ -293,14 +325,10 @@ fun AddTaskSheetV2(
                     },
                 )
                 Spacer(Modifier.width(10.dp))
-                MaterialSymbol(
-                    "mic", tokens.neutrals.textTertiary.toColor(), size = 20.sp, filled = false,
-                    modifier = Modifier.clickable {
-                        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                        }
-                        runCatching { speechLauncher.launch(intent) }
-                    },
+                MicButton(
+                    currentText = { title },
+                    onTextChange = { title = it },
+                    size = 20.sp,
                 )
             }
 
@@ -335,25 +363,30 @@ fun AddTaskSheetV2(
                 Spacer(Modifier.height(18.dp))
             }
 
-            // Compact bucket chips
+            // Compact bucket chips with scaling based on count
             if (buckets.isNotEmpty() && whenPath != WhenPath.BRAIN_DUMP) {
                 FieldLabel("Bucket")
                 Spacer(Modifier.height(9.dp))
+                val scrollable = buckets.size > 4
+                val rowModifier = if (scrollable) Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+                    else Modifier.fillMaxWidth()
                 Row(
-                    Modifier.fillMaxWidth(),
+                    rowModifier,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.Top,
                 ) {
                     buckets.forEach { b ->
                         val colors = bucketColorsOf(b.colorKey)
                         val sel = b.optionId == bucketId
+                        val iconSize = if (scrollable) 36.dp else 48.dp
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.clickable { bucketId = b.optionId },
+                            modifier = (if (!scrollable) Modifier.weight(1f) else Modifier)
+                                .clickable { bucketId = b.optionId },
                         ) {
                             Box(
                                 Modifier
-                                    .size(36.dp)
+                                    .size(iconSize)
                                     .clip(androidx.compose.foundation.shape.CircleShape)
                                     .background(colors.bg.toColor())
                                     .then(
@@ -362,7 +395,7 @@ fun AddTaskSheetV2(
                                     ),
                                 contentAlignment = Alignment.Center,
                             ) {
-                                MaterialSymbol(b.icon, colors.onColor.toColor(), size = 18.sp, filled = true)
+                                MaterialSymbol(b.icon, colors.onColor.toColor(), size = (iconSize.value * 0.5f).sp, filled = true)
                             }
                             if (sel) {
                                 Text(
@@ -419,10 +452,13 @@ fun AddTaskSheetV2(
                             filled = hasDate,
                         )
                         Text(
-                            if (hasDate) humanDate(selectedDate!!) else "Date",
+                            if (hasDate) formatShortDate(selectedDate!!) else "Date",
                             color = if (hasDate) todayAccent else tokens.neutrals.textSecondary.toColor(),
                             fontSize = 13.5.sp,
                             fontWeight = if (hasDate) FontWeight.SemiBold else FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.widthIn(max = 80.dp),
                         )
                         if (hasDate) {
                             Spacer(Modifier.weight(1f))
@@ -457,80 +493,112 @@ fun AddTaskSheetV2(
                             else tokens.neutrals.textTertiary.toColor().copy(alpha = 0.45f)
                         MaterialSymbol("schedule", timeColor, size = 19.sp, filled = false)
                         Text(
-                            if (time != null) "%02d:%02d".format(time!!.first, time!!.second) else "Time",
+                            if (time != null) formatHourMinute(time!!.first, time!!.second, settings.use24HourTime) else "Time",
                             color = timeColor,
                             fontSize = 13.5.sp,
                             fontWeight = FontWeight.Medium,
                         )
                     }
 
-                    // Repeat button
-                    val hasRepeat = repeat.rrule != null
-                    Box(
-                        Modifier
-                            .size(44.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .then(
-                                if (hasRepeat) Modifier
-                                    .background(todayAccent.copy(alpha = 0.16f))
-                                    .border(1.5.dp, todayAccent, RoundedCornerShape(12.dp))
-                                else Modifier
-                                    .background(tokens.neutrals.surface.toColor())
-                                    .border(1.dp, tokens.neutrals.border.toColor(), RoundedCornerShape(12.dp))
+                    // Recurrence button with tap-to-cycle and long-press detail
+                    @OptIn(ExperimentalFoundationApi::class)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        val hasRepeat = recurrenceRule != null
+                        val dateGated = hasDate(whenPath, selectedDate)
+                        Box(
+                            Modifier
+                                .size(44.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .then(
+                                    if (hasRepeat) Modifier
+                                        .background(todayAccent.copy(alpha = 0.16f))
+                                        .border(1.5.dp, todayAccent, RoundedCornerShape(12.dp))
+                                    else Modifier
+                                        .background(tokens.neutrals.surface.toColor())
+                                        .border(1.dp, tokens.neutrals.border.toColor(), RoundedCornerShape(12.dp))
+                                )
+                                .combinedClickable(
+                                    enabled = dateGated,
+                                    onClick = {
+                                        // Tap to cycle through recurrence presets
+                                        val currentIdx = RECURRENCE_CYCLE.indexOf(recurrenceRule)
+                                        val nextIdx = (currentIdx + 1) % RECURRENCE_CYCLE.size
+                                        recurrenceRule = RECURRENCE_CYCLE[nextIdx]
+                                    },
+                                    onLongClick = {
+                                        // Long-press to open detail sheet
+                                        if (dateGated) showRepeatPicker = true
+                                    },
+                                ),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            MaterialSymbol(
+                                "repeat",
+                                if (hasRepeat) todayAccent else tokens.neutrals.textSecondary.toColor(),
+                                size = 20.sp,
+                                filled = hasRepeat,
                             )
-                            .clickable(enabled = hasDate(whenPath, selectedDate)) { showRepeatPicker = true },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        MaterialSymbol(
-                            "repeat",
-                            if (hasRepeat) todayAccent else tokens.neutrals.textSecondary.toColor(),
-                            size = 20.sp,
-                            filled = hasRepeat,
-                        )
+                        }
+                        // Custom rules from the long-press builder (e.g. FREQ=WEEKLY;INTERVAL=2)
+                        // are not in RECURRENCE_LABELS; show "Custom" so the state stays visible.
+                        val label = recurrenceRule?.let { RECURRENCE_LABELS[it] ?: "Custom" }
+                        if (label != null) {
+                            Text(
+                                label,
+                                color = tokens.neutrals.textTertiary.toColor(),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.padding(top = 2.dp),
+                            )
+                        }
                     }
                 }
 
                 Spacer(Modifier.height(12.dp))
 
-                // Quick-date chips or helper text
-                if (!hasDate(whenPath, selectedDate)) {
-                    val today = LocalDate.now()
+                // Quick-date chips (animated collapse when a date is selected)
+                AnimatedVisibility(
+                    visible = !hasDate(whenPath, selectedDate),
+                    enter = expandVertically(animationSpec = tween(200)),
+                    exit = shrinkVertically(animationSpec = tween(200)),
+                ) {
                     Row(
                         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(7.dp),
                     ) {
                         QuickDateChip("Later today") {
+                            val now = LocalDateTime.now()
+                            val (ltDate, ltTime) = quickDateLaterToday(now.hour, now.minute, todayIso)
+                            selectedDate = ltDate
+                            time = ltTime
                             whenPath = WhenPath.DATE
-                            selectedDate = today.toString()
                         }
                         QuickDateChip("Tomorrow") {
+                            val (tmDate, tmTime) = quickDateTomorrow(todayIso)
+                            selectedDate = tmDate
+                            time = tmTime
                             whenPath = WhenPath.DATE
-                            selectedDate = today.plusDays(1).toString()
                         }
                         QuickDateChip("Next week") {
+                            val (nwDate, nwTime) = quickDateNextWeek(todayIso)
+                            selectedDate = nwDate
+                            time = nwTime
                             whenPath = WhenPath.DATE
-                            selectedDate = today.with(java.time.temporal.TemporalAdjusters.next(java.time.DayOfWeek.MONDAY)).toString()
                         }
                         QuickDateChip("Next month") {
+                            val (nmDate, nmTime) = quickDateNextMonth(todayIso)
+                            selectedDate = nmDate
+                            time = nmTime
                             whenPath = WhenPath.DATE
-                            selectedDate = today.plusMonths(1).withDayOfMonth(1).toString()
-                        }
-                        Box(
-                            Modifier
-                                .size(36.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(tokens.neutrals.surface.toColor())
-                                .border(1.dp, tokens.neutrals.border.toColor(), RoundedCornerShape(10.dp))
-                                .clickable {
-                                    whenPath = WhenPath.DATE
-                                    showDatePicker = true
-                                },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            MaterialSymbol("calendar_month", tokens.neutrals.textSecondary.toColor(), size = 18.sp, filled = false)
                         }
                     }
-                } else {
+                }
+                // Helper text (animated fade-in when date is selected)
+                AnimatedVisibility(
+                    visible = hasDate(whenPath, selectedDate),
+                    enter = fadeIn(animationSpec = tween(200)),
+                    exit = fadeOut(animationSpec = tween(150)),
+                ) {
                     Text(
                         "Sift handles the priority. Adjust anytime.",
                         color = tokens.neutrals.textTertiary.toColor(),
@@ -601,6 +669,12 @@ fun AddTaskSheetV2(
                             }
                             inner()
                         },
+                    )
+                    MicButton(
+                        currentText = { notes },
+                        onTextChange = { notes = it },
+                        size = 18.sp,
+                        modifier = Modifier.padding(top = 1.dp),
                     )
                 }
             }
@@ -679,40 +753,13 @@ fun AddTaskSheetV2(
     }
 
     if (showRepeatPicker) {
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { showRepeatPicker = false },
-            confirmButton = {},
-            title = { Text("Repeat", fontWeight = FontWeight.Bold) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    REPEAT_CHOICES.forEach { choice ->
-                        val selected = repeat == choice
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
-                                .clickable { repeat = choice; showRepeatPicker = false }
-                                .padding(vertical = 10.dp, horizontal = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            MaterialSymbol(
-                                "check_circle",
-                                if (selected) todayAccent else tokens.neutrals.textTertiary.toColor(),
-                                size = 20.sp,
-                                filled = selected,
-                            )
-                            Text(
-                                choice.label,
-                                color = tokens.neutrals.textPrimary.toColor(),
-                                fontSize = 15.sp,
-                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                            )
-                        }
-                    }
-                }
+        RecurrenceBuilderSheet(
+            initialRule = recurrenceRule,
+            onConfirm = { rrule, _ ->
+                recurrenceRule = rrule
+                showRepeatPicker = false
             },
-            containerColor = tokens.neutrals.surfaceRaised.toColor(),
+            onDismiss = { showRepeatPicker = false },
         )
     }
 
@@ -723,10 +770,10 @@ fun AddTaskSheetV2(
                 scope.launch {
                     val ok = viewModel.grantRecurrence()
                     showConsent = false
-                    if (ok) submit() else { repeat = REPEAT_CHOICES.first(); error = "Recurring tasks are unavailable for this database." }
+                    if (ok) submit() else { recurrenceRule = null; error = "Recurring tasks are unavailable for this database." }
                 }
             },
-            onDismiss = { showConsent = false; repeat = REPEAT_CHOICES.first() },
+            onDismiss = { showConsent = false; recurrenceRule = null },
         )
     }
 }
@@ -734,22 +781,6 @@ fun AddTaskSheetV2(
 private fun hasDate(whenPath: WhenPath?, selectedDate: String?): Boolean =
     whenPath == WhenPath.DATE && selectedDate != null
 
-private fun humanDate(isoDate: String): String {
-    return try {
-        val date = LocalDate.parse(isoDate)
-        val month = date.month.name.take(3).lowercase().replaceFirstChar { it.uppercase() }
-        "$month ${date.dayOfMonth}"
-    } catch (_: Exception) { isoDate }
-}
-
-private data class RepeatChoice2(val label: String, val chipLabel: String, val rrule: String?)
-private val REPEAT_CHOICES = listOf(
-    RepeatChoice2("Does not repeat", "None", null),
-    RepeatChoice2("Every day", "Daily", "FREQ=DAILY"),
-    RepeatChoice2("Every week", "Weekly", "FREQ=WEEKLY"),
-    RepeatChoice2("Every weekday", "Weekdays", "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"),
-    RepeatChoice2("Every month", "Monthly", "FREQ=MONTHLY"),
-)
 
 @Composable
 private fun FieldLabel(text: String) {

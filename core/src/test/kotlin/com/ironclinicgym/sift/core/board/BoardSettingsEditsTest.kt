@@ -80,4 +80,36 @@ class BoardSettingsEditsTest {
     @Test fun `time gating toggles the global flag`() {
         assertTrue(settings().setTimeGating(true).timeGatingEnabled)
     }
+
+    @Test fun `single column limit defaults to 8`() {
+        assertEquals(8, settings().singleColumnLimit)
+    }
+
+    @Test fun `single column limit setter applies a new value`() {
+        assertEquals(12, settings().setSingleColumnLimit(12).singleColumnLimit)
+    }
+
+    @Test fun `single column limit resolves within range as itself`() {
+        assertEquals(12, settings().setSingleColumnLimit(12).resolvedSingleColumnLimit())
+    }
+
+    @Test fun `single column limit resolves the show all sentinel to no cap`() {
+        assertEquals(Int.MAX_VALUE, settings().setSingleColumnLimit(0).resolvedSingleColumnLimit())
+    }
+
+    @Test fun `single column limit round trips through json`() {
+        val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; encodeDefaults = true }
+        val encoded = json.encodeToString(BoardSettings.serializer(), settings().setSingleColumnLimit(15))
+        val decoded = json.decodeFromString(BoardSettings.serializer(), encoded)
+        assertEquals(15, decoded.singleColumnLimit)
+    }
+
+    @Test fun `single column limit defaults on decode when absent from stored json`() {
+        // Simulates an existing user's persisted settings saved before this field existed.
+        val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; encodeDefaults = true }
+        val encoded = json.encodeToString(BoardSettings.serializer(), settings())
+        val withoutField = encoded.replace(Regex(",\"singleColumnLimit\":\\d+"), "")
+        val decoded = json.decodeFromString(BoardSettings.serializer(), withoutField)
+        assertEquals(8, decoded.singleColumnLimit)
+    }
 }

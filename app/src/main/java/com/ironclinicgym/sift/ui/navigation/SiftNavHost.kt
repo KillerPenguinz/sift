@@ -1,12 +1,12 @@
 package com.ironclinicgym.sift.ui.navigation
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -24,10 +24,13 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.ironclinicgym.sift.SiftApp
+import com.ironclinicgym.sift.ui.board.ActionHistoryScreen
 import com.ironclinicgym.sift.ui.board.BoardViewModel
 import com.ironclinicgym.sift.ui.board.SiftPagerScreen
 import com.ironclinicgym.sift.ui.board.CustomizeBoardScreen
 import com.ironclinicgym.sift.ui.board.FocusedPriorityScreen
+import com.ironclinicgym.sift.ui.board.MenuHubScreen
+import com.ironclinicgym.sift.ui.board.NotificationCenterScreen
 import com.ironclinicgym.sift.ui.common.appViewModel
 import com.ironclinicgym.sift.ui.onboarding.AutoSetupScreen
 import com.ironclinicgym.sift.ui.onboarding.ByoDatabasePickerScreen
@@ -130,7 +133,7 @@ fun SiftNavHost(navController: NavHostController = rememberNavController()) {
                 viewModel = boardVm,
                 fromSetup = fromSetup,
                 onOpenPriority = { priorityId -> navController.navigate("${Routes.FOCUSED_PRIORITY}/${android.net.Uri.encode(priorityId)}") },
-                onSettings = { navController.navigate(Routes.SETTINGS) },
+                onOpenMenu = { navController.navigate(Routes.MENU_HUB) },
             )
         }
 
@@ -155,6 +158,7 @@ fun SiftNavHost(navController: NavHostController = rememberNavController()) {
                         popUpTo(navController.graph.id) { inclusive = true }
                     }
                 },
+                boardVm = boardVm,
             )
         }
 
@@ -171,6 +175,29 @@ fun SiftNavHost(navController: NavHostController = rememberNavController()) {
                     }
                 },
             )
+        }
+
+        composable(Routes.MENU_HUB) {
+            LaunchedEffect(Unit) { boardVm.markNotificationsRead() }
+            MenuHubScreen(
+                viewModel = boardVm,
+                onNotifications = { navController.navigate(Routes.NOTIFICATION_CENTER) },
+                onActionHistory = { navController.navigate(Routes.ACTION_HISTORY) },
+                onSettings = { navController.navigate(Routes.SETTINGS) },
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(Routes.NOTIFICATION_CENTER) {
+            NotificationCenterScreen(
+                viewModel = boardVm,
+                onBack = { navController.popBackStack() },
+                onAction = { route -> navController.navigate(route) },
+            )
+        }
+
+        composable(Routes.ACTION_HISTORY) {
+            ActionHistoryScreen(viewModel = boardVm, onBack = { navController.popBackStack() })
         }
     }
 }

@@ -1,0 +1,138 @@
+{
+  "planFile": "docs/superpowers/plans/2026-07-09-phase-3-5-round-2.md",
+  "createdAt": "2026-07-09T00:00:00Z",
+  "tasks": [
+    {
+      "nativeTaskId": "10",
+      "planTaskNumber": 1,
+      "subject": "Task 1: Quick Bug Fixes \u2014 Bottom Nav, Minus Icon, Brain Dump Text",
+      "status": "completed",
+      "modelTier": "mechanical",
+      "blockedBy": [],
+      "lastUpdated": "2026-07-09T00:00:00Z"
+    },
+    {
+      "nativeTaskId": "11",
+      "planTaskNumber": 2,
+      "subject": "Task 2: Notification + Action History Data Layer",
+      "status": "completed",
+      "modelTier": "mechanical",
+      "blockedBy": [],
+      "lastUpdated": "2026-07-09T00:00:00Z"
+    },
+    {
+      "nativeTaskId": "12",
+      "planTaskNumber": 3,
+      "subject": "Task 3: Menu Hub Navigation + Badge",
+      "status": "completed",
+      "modelTier": "standard",
+      "blockedBy": [
+        "11"
+      ],
+      "lastUpdated": "2026-07-09T00:00:00Z"
+    },
+    {
+      "nativeTaskId": "13",
+      "planTaskNumber": 4,
+      "subject": "Task 4: Notification System Overhaul \u2014 Queuing, Repositioning, Sync Indicator",
+      "status": "completed",
+      "modelTier": "standard",
+      "blockedBy": [
+        "11"
+      ],
+      "lastUpdated": "2026-07-09T00:00:00Z"
+    },
+    {
+      "nativeTaskId": "14",
+      "planTaskNumber": 5,
+      "subject": "Task 5: Notification Center + Action History Screens",
+      "status": "completed",
+      "modelTier": "standard",
+      "blockedBy": [
+        "11"
+      ],
+      "lastUpdated": "2026-07-09T00:00:00Z"
+    },
+    {
+      "nativeTaskId": "15",
+      "planTaskNumber": 6,
+      "subject": "Task 6: Safety Catch On-Launch + Cooldown",
+      "status": "completed",
+      "modelTier": "standard",
+      "blockedBy": [
+        "11",
+        "13"
+      ],
+      "lastUpdated": "2026-07-10T00:00:00Z"
+    },
+    {
+      "nativeTaskId": "23",
+      "planTaskNumber": 7,
+      "subject": "Task 7: Inline Voice Input with SpeechRecognizer",
+      "status": "completed",
+      "modelTier": "standard",
+      "blockedBy": [],
+      "lastUpdated": "2026-07-09T00:00:00Z"
+    },
+    {
+      "nativeTaskId": "24",
+      "planTaskNumber": 8,
+      "subject": "Task 8: Add-Task Drawer UX \u2014 Bucket Scaling, Date Chip, Recurrence Cycle",
+      "status": "completed",
+      "modelTier": "mechanical",
+      "blockedBy": [],
+      "lastUpdated": "2026-07-09T00:00:00Z"
+    },
+    {
+      "nativeTaskId": "25",
+      "planTaskNumber": 9,
+      "subject": "Task 9: Post-Save Animation",
+      "status": "completed",
+      "modelTier": "standard",
+      "blockedBy": [],
+      "lastUpdated": "2026-07-09T00:00:00Z"
+    },
+    {
+      "nativeTaskId": "26",
+      "planTaskNumber": 10,
+      "subject": "Task 10: Board Layout \u2014 Pinned as Bucket, Single-Column Limit",
+      "status": "completed",
+      "modelTier": "standard",
+      "blockedBy": [],
+      "lastUpdated": "2026-07-09T00:00:00Z"
+    },
+    {
+      "nativeTaskId": "27",
+      "planTaskNumber": 11,
+      "subject": "Task 11: Task Detail Sheet Fixes",
+      "status": "completed",
+      "modelTier": "standard",
+      "blockedBy": [
+        "13"
+      ],
+      "lastUpdated": "2026-07-10T00:00:00Z"
+    },
+    {
+      "nativeTaskId": "28",
+      "planTaskNumber": 12,
+      "subject": "Task 12: Labels System + Brain Dump Enhancements",
+      "status": "completed",
+      "modelTier": "frontier",
+      "blockedBy": [
+        "11"
+      ],
+      "lastUpdated": "2026-07-10T00:00:00Z"
+    },
+    {
+      "nativeTaskId": "29",
+      "planTaskNumber": 13,
+      "subject": "Task 13: Protected Pin Discoverability",
+      "status": "completed",
+      "modelTier": "mechanical",
+      "blockedBy": [
+        "27"
+      ],
+      "lastUpdated": "2026-07-10T00:00:00Z"
+    }
+  ]
+}

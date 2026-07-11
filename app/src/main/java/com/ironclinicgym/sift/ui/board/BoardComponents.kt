@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -198,6 +199,30 @@ fun PriorityCard(
                     modifier = Modifier.fillMaxWidth().clickable(onClick = onOpenPriority).padding(top = 4.dp),
                 )
             }
+        }
+    }
+}
+
+/**
+ * The menu hub icon for screen headers, with an unread notification badge dot.
+ * Shared by the board and brain dump headers so the badge stays visually identical.
+ */
+@Composable
+fun MenuIconWithBadge(showBadge: Boolean, onClick: () -> Unit) {
+    val tokens = SiftTheme.tokens
+    Box {
+        Box(Modifier.size(40.dp).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
+            MaterialSymbol("menu", tokens.neutrals.textSecondary.toColor(), size = 22.sp, filled = false)
+        }
+        if (showBadge) {
+            Box(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 4.dp, end = 4.dp)
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(tokens.overdueText.toColor()),
+            )
         }
     }
 }

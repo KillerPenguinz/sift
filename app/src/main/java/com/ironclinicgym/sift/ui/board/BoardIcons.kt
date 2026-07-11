@@ -15,8 +15,14 @@ import com.ironclinicgym.sift.ui.theme.MaterialSymbolsOutline
  * font does not resolve ligatures, which showed the literal names). Names come from the
  * theme/mapping and the icon picker, never hardcoded at a UI call site. Unknown names fall back
  * to a label glyph rather than breaking layout.
+ *
+ * Codepoints are the Material Symbols Rounded PUA values (a few reuse the legacy Material Icons
+ * slots the variable font still carries). The bundled font at res/font/material_symbols_rounded.ttf
+ * is a SUBSET: whenever you add an entry here you MUST regenerate the subset from the full variable
+ * font so the new glyph is actually present, or it renders as a tofu box. BoardIconsFontTest guards
+ * both failure modes (missing glyph, and a referenced name absent from this map) in CI.
  */
-private val CODEPOINTS: Map<String, Char> = mapOf(
+internal val CODEPOINTS: Map<String, Char> = mapOf(
     // Priority urgency icons
     "bolt" to Char(0xea0b), "wb_sunny" to Char(0xe430), "wb_twilight" to Char(0xe1c6),
     "eco" to Char(0xea35), "event" to Char(0xe878), "bedtime" to Char(0xf159),
@@ -43,9 +49,21 @@ private val CODEPOINTS: Map<String, Char> = mapOf(
     "push_pin" to Char(0xf10d), "open_in_new" to Char(0xe89e), "notifications" to Char(0xe7f4),
     "lightbulb" to Char(0xe0f0), "dashboard" to Char(0xe871),
     // Redesign additions
-    "keep" to Char(0xf4e2), "north_east" to Char(0xf1e1), "mic" to Char(0xe029),
-    "cloud_off" to Char(0xe167), "calendar_month" to Char(0xebcc), "repeat" to Char(0xe040),
-    "notes" to Char(0xe26c),
+    "keep" to Char(0xe6aa), "north_east" to Char(0xf1e1), "mic" to Char(0xe029),
+    "cloud_off" to Char(0xe2c1), "calendar_month" to Char(0xebcc), "repeat" to Char(0xe040),
+    "notes" to Char(0xe26c), "remove" to Char(0xe15b), "horizontal_rule" to Char(0xf108),
+    // Menu hub additions
+    "menu" to Char(0xe5d2), "history" to Char(0xe889), "shield" to Char(0xe9e0),
+    "sort" to Char(0xe164), "arrow_upward" to Char(0xe5d8), "arrow_downward" to Char(0xe5db),
+    "sell" to Char(0xf05b),
+    // Settings, brain dump, and redirect prompt icons (were falling back to the label glyph)
+    "brightness_auto" to Char(0xe1ab), "calendar_today" to Char(0xe935), "check" to Char(0xe5ca),
+    "dark_mode" to Char(0xe51c), "edit_note" to Char(0xe745), "event_busy" to Char(0xe615),
+    "format_list_numbered" to Char(0xe242), "help" to Char(0xe887), "label_off" to Char(0xe9b6),
+    "light_mode" to Char(0xe518), "notifications_active" to Char(0xe7f7),
+    "priority_high" to Char(0xe645), "restart_alt" to Char(0xf053),
+    "radio_button_checked" to Char(0xe837), "radio_button_unchecked" to Char(0xe836),
+    "camera" to Char(0xe3af),
 )
 
 /** Icon names offered when the user customizes a bucket. */

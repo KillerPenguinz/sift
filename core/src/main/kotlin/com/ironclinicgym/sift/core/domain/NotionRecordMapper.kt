@@ -50,7 +50,7 @@ object NotionRecordMapper {
             bucketOptionId = bucketId,
             bucketOptionName = bucketName,
             isDone = readDone(statusProp),
-            due = dueProp?.get("date")?.jsonObject?.get("start")?.jsonPrimitive?.content,
+            due = (dueProp?.get("date") as? JsonObject)?.get("start")?.jsonPrimitive?.content,
             notes = readRichText(notesProp),
             recurrenceRule = readRichText(recurrenceRuleProp),
             recurrenceDisplay = readRichText(recurrenceDisplayProp),

@@ -6,11 +6,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -43,7 +45,7 @@ fun SiftPagerScreen(
     viewModel: BoardViewModel,
     fromSetup: Boolean,
     onOpenPriority: (String) -> Unit,
-    onSettings: () -> Unit,
+    onOpenMenu: () -> Unit,
 ) {
     val tokens = SiftTheme.tokens
     val pagerState = rememberPagerState(pageCount = { 2 })
@@ -53,24 +55,26 @@ fun SiftPagerScreen(
 
     var showAddTask by remember { mutableStateOf(false) }
     var editingTask by remember { mutableStateOf<ProjectedItem?>(null) }
+    var showMinimizedBar by remember { mutableStateOf(false) }
+    var selectedBrainDumpItem by remember { mutableStateOf<ProjectedItem?>(null) }
 
     Box(Modifier.fillMaxSize().background(tokens.neutrals.bg.toColor())) {
         HorizontalPager(
             state = pagerState,
-            modifier = Modifier.fillMaxSize().padding(bottom = 48.dp + navBarInset),
+            modifier = Modifier.fillMaxSize().padding(bottom = 64.dp + navBarInset),
         ) { page ->
             when (page) {
                 0 -> BoardScreen(
                     viewModel = viewModel,
                     fromSetup = fromSetup,
                     onOpenPriority = onOpenPriority,
-                    onSettings = onSettings,
+                    onOpenMenu = onOpenMenu,
                     onEditTask = { item -> editingTask = item },
                 )
                 1 -> BrainDumpScreen(
                     viewModel = viewModel,
-                    onTap = {},
-                    onSettings = onSettings,
+                    onTap = { item -> selectedBrainDumpItem = item },
+                    onOpenMenu = onOpenMenu,
                 )
             }
         }
@@ -96,6 +100,31 @@ fun SiftPagerScreen(
         ) {
             MaterialSymbol("add", tokens.neutrals.bg.toColor(), size = 28.sp)
         }
+
+        // Post-save capture bar — shown after a successful save, invites the next item
+        if (showMinimizedBar && !showAddTask) {
+            PostSaveCaptureBar(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 60.dp + navBarInset, start = 16.dp, end = 16.dp),
+                onTapTask = {
+                    showMinimizedBar = false
+                    showAddTask = true
+                },
+                onTapDump = {
+                    viewModel.pendingDraft = BoardViewModel.DraftState(
+                        title = "",
+                        notes = "",
+                        bucketId = null,
+                        isBrainDump = true,
+                        dateIso = null,
+                    )
+                    showMinimizedBar = false
+                    showAddTask = true
+                },
+                onDismissed = { showMinimizedBar = false },
+            )
+        }
     }
 
     val activeSettings = settings
@@ -104,7 +133,31 @@ fun SiftPagerScreen(
             viewModel = viewModel,
             settings = activeSettings,
             editing = editingTask,
+            onSaved = {
+                showAddTask = false
+                editingTask = null
+                showMinimizedBar = true
+            },
             onDismiss = { showAddTask = false; editingTask = null },
+        )
+    }
+
+    val showProtectedReview by viewModel.showProtectedReview.collectAsStateWithLifecycle()
+    val protectedTasks by viewModel.protectedTasks.collectAsStateWithLifecycle()
+    if (showProtectedReview) {
+        ProtectedReviewScreen(
+            tasks = protectedTasks,
+            onUnprotect = { pageId -> viewModel.unprotectTask(pageId) },
+            onBack = { viewModel.closeProtectedReview() },
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+
+    selectedBrainDumpItem?.let { item ->
+        BrainDumpDetailSheet(
+            item = item,
+            viewModel = viewModel,
+            onDismiss = { selectedBrainDumpItem = null },
         )
     }
 }
@@ -128,14 +181,14 @@ private fun SiftTabBar(
         Row(
             Modifier
                 .fillMaxWidth()
-                .padding(bottom = navBarInset)
-                .height(52.dp),
+                .heightIn(min = 56.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
             TabItem(icon = "check_circle", label = "Board", selected = selectedIndex == 0, onClick = { onSelect(0) })
             TabItem(icon = "lightbulb", label = "Brain dump", selected = selectedIndex == 1, onClick = { onSelect(1) })
         }
+        Spacer(Modifier.height(navBarInset))
     }
 }
 

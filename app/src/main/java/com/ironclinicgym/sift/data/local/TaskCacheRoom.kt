@@ -66,13 +66,16 @@ interface TaskCacheDao {
 }
 
 @Database(
-    entities = [CachedTaskEntity::class, TaskLocalStateEntity::class],
-    version = 5,
+    entities = [CachedTaskEntity::class, TaskLocalStateEntity::class, NotificationEntity::class, ActionHistoryEntity::class, LabelEntity::class],
+    version = 8,
     exportSchema = false,
 )
 abstract class SiftDatabase : RoomDatabase() {
     abstract fun taskCacheDao(): TaskCacheDao
     abstract fun taskLocalStateDao(): TaskLocalStateDao
+    abstract fun notificationDao(): NotificationDao
+    abstract fun actionHistoryDao(): ActionHistoryDao
+    abstract fun labelDao(): LabelDao
 }
 
 /**
@@ -130,6 +133,50 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
 val MIGRATION_4_5 = object : Migration(4, 5) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE task_local_state ADD COLUMN createdBy TEXT NOT NULL DEFAULT 'sift'")
+    }
+}
+
+/** v5 -> v6: Safety catch band tracking — records which urgency band last triggered the prompt. */
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL(
+            "ALTER TABLE task_local_state ADD COLUMN safetyCatchFiredBand TEXT"
+        )
+    }
+}
+
+/** v6 -> v7: Notification center, action history, and labels tables. */
+val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `notifications` (" +
+                "`id` TEXT NOT NULL, `message` TEXT NOT NULL, `icon` TEXT NOT NULL, " +
+                "`tier` TEXT NOT NULL, `actionLabel` TEXT, `actionRoute` TEXT, " +
+                "`isRead` INTEGER NOT NULL DEFAULT 0, `timestamp` INTEGER NOT NULL, " +
+                "PRIMARY KEY(`id`))"
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `action_history` (" +
+                "`id` TEXT NOT NULL, `description` TEXT NOT NULL, `taskTitle` TEXT NOT NULL, " +
+                "`taskPageId` TEXT, `timestamp` INTEGER NOT NULL, " +
+                "`canUndo` INTEGER NOT NULL DEFAULT 0, `isSynced` INTEGER NOT NULL DEFAULT 0, " +
+                "PRIMARY KEY(`id`))"
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `labels` (" +
+                "`id` TEXT NOT NULL, `mappingId` TEXT NOT NULL, " +
+                "`name` TEXT NOT NULL, `colorHex` TEXT NOT NULL, `icon` TEXT NOT NULL, " +
+                "PRIMARY KEY(`id`))"
+        )
+        db.execSQL("ALTER TABLE task_local_state ADD COLUMN lastSafetyCatchShownAt INTEGER")
+    }
+}
+
+/** v7 -> v8: Adds labelId and lastModifiedAt columns to task_local_state for the labels system. */
+val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE task_local_state ADD COLUMN labelId TEXT")
+        db.execSQL("ALTER TABLE task_local_state ADD COLUMN lastModifiedAt INTEGER")
     }
 }
 

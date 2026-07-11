@@ -61,13 +61,12 @@ fun FocusedPriorityScreen(viewModel: BoardViewModel, priorityId: String, onBack:
     var selected by remember { mutableStateOf<ProjectedItem?>(null) }
     var editing by remember { mutableStateOf<ProjectedItem?>(null) }
     var showAdd by remember { mutableStateOf(false) }
-    var itemForPriorityPicker by remember { mutableStateOf<ProjectedItem?>(null) }
-    var showPriorityPicker by remember { mutableStateOf(false) }
-    val snackbar = remember { androidx.compose.material3.SnackbarHostState() }
+    // Title of the most recently removed task, shown in the undo bar in place of the generic
+    // core-level label; see the matching note in BoardScreen.kt.
+    var pendingRemoveTitle by remember { mutableStateOf<String?>(null) }
+    val currentNotification by viewModel.currentNotification.collectAsStateWithLifecycle()
     val tokens = SiftTheme.tokens
     val topInset = WindowInsets.safeDrawing.asPaddingValues().calculateTopPadding()
-
-    LaunchedEffect(Unit) { viewModel.messages.collect { snackbar.showSnackbar(it) } }
 
     Surface(Modifier.fillMaxSize(), color = tokens.neutrals.bg.toColor()) {
       Box(Modifier.fillMaxSize()) {
@@ -198,21 +197,43 @@ fun FocusedPriorityScreen(viewModel: BoardViewModel, priorityId: String, onBack:
             }
         }
 
-        // Transient messages at the bottom.
-        androidx.compose.material3.SnackbarHost(
-            snackbar,
-            Modifier.align(Alignment.BottomCenter),
-        ) { androidx.compose.material3.Snackbar(it) }
+        val currentUndo = undoToken
+        val currentEntry = currentNotification
 
-        undoToken?.let { token ->
+        // Floating margin: NotificationRow no longer carries its own outer padding (the board
+        // and brain dump subheader slots supply it), so this floating placement adds it here.
+        val floatingModifier = Modifier
+            .align(Alignment.TopCenter)
+            .padding(top = topInset)
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+
+        if (currentUndo != null) {
+            val undoLabel = if (currentUndo.label == "Task removed" && pendingRemoveTitle != null) {
+                "Removed $pendingRemoveTitle"
+            } else {
+                currentUndo.label
+            }
             TopNotificationBar(
                 variant = NotificationVariant.Reversible(
-                    message = token.label,
+                    message = undoLabel,
                     icon = "swap_horiz",
                     onUndo = { viewModel.undo() },
                 ),
                 onDismiss = { viewModel.dismissUndo() },
-                modifier = Modifier.align(Alignment.TopCenter).padding(top = topInset),
+                modifier = floatingModifier,
+                timerKey = BoardViewModel.UNDO_BAR_ID,
+            )
+        } else if (currentEntry != null) {
+            TopNotificationBar(
+                variant = currentEntry.variant,
+                onDismiss = {
+                    viewModel.dismissNotification(currentEntry.id)
+                    if (currentEntry.variant is NotificationVariant.InflationNudge) {
+                        viewModel.dismissInflationAlert()
+                    }
+                },
+                modifier = floatingModifier,
+                timerKey = currentEntry.id,
             )
         }
 
@@ -224,36 +245,24 @@ fun FocusedPriorityScreen(viewModel: BoardViewModel, priorityId: String, onBack:
                 onLoadBody = { viewModel.loadPageBody(item.task.pageId) },
                 onEdit = { editing = item; selected = null },
                 onComplete = { viewModel.completeTask(item.task.pageId); selected = null },
-                onPin = { viewModel.pinTask(item.task.pageId); selected = null },
-                onRemove = { viewModel.removeTask(item.task.pageId); selected = null },
+                // Pin cycles in place; the sheet stays open so the user can keep reviewing the task.
+                onPin = { viewModel.pinTask(item.task.pageId) },
+                onRemove = {
+                    pendingRemoveTitle = item.task.title
+                    viewModel.removeTask(item.task.pageId)
+                    selected = null
+                },
                 onChangeDate = {
                     val task = selected?.task ?: return@TaskDetailSheet
                     selected = null
                     viewModel.openRedirectPromptForTask(task)
                 },
-                onChangePriority = {
-                    itemForPriorityPicker = selected
-                    selected = null
-                    showPriorityPicker = true
+                onChangePriority = { pv ->
+                    viewModel.moveTask(item.task.pageId, pv.optionName ?: pv.displayName, pv.optionId)
                 },
                 onDismiss = { selected = null },
+                frictionActive = protectedFriction != null,
             )
-        }
-
-        if (showPriorityPicker) {
-            val pickerItem = itemForPriorityPicker
-            if (pickerItem == null) {
-                showPriorityPicker = false
-            } else {
-                PriorityPickerSheet(
-                    priorities = settings?.priorities ?: emptyList(),
-                    currentPriorityOptionId = pickerItem.task.priorityOptionId,
-                    onSelect = { pv ->
-                        viewModel.moveTask(pickerItem.task.pageId, pv.optionName ?: pv.displayName, pv.optionId)
-                    },
-                    onDismiss = { showPriorityPicker = false; itemForPriorityPicker = null },
-                )
-            }
         }
 
         val activeSettings = settings
