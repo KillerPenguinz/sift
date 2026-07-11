@@ -35,7 +35,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -85,7 +84,6 @@ fun TaskDetailSheet(
     // the task object passed in won't recompose with the new pin state until the parent's data
     // refreshes, so the sheet tracks its own optimistic copy of the cycle.
     var localPinLevel by remember(item.task.pageId) { mutableIntStateOf(item.task.pinLevel) }
-    var pinStateLabel by remember { mutableStateOf<String?>(null) }
     var showInlinePriority by remember(item.task.pageId) { mutableStateOf(false) }
     // Local override for which priority chip reads as "selected" in the inline picker, for the
     // same reason as localPinLevel: item.task won't recompose in place after a move.
@@ -96,12 +94,6 @@ fun TaskDetailSheet(
     // task snapshot already has everywhere, and not misleading in a harmful direction.
     LaunchedEffect(frictionActive) {
         if (frictionActive) localPriorityOptionId = item.task.priorityOptionId
-    }
-    LaunchedEffect(pinStateLabel) {
-        if (pinStateLabel != null) {
-            delay(2000)
-            pinStateLabel = null
-        }
     }
     val body by produceState<List<String>?>(initialValue = null, item.task.pageId) {
         value = runCatching { onLoadBody() }.getOrDefault(emptyList())
@@ -120,9 +112,11 @@ fun TaskDetailSheet(
         Column(
             Modifier.fillMaxWidth().padding(horizontal = 22.dp).padding(bottom = 26.dp),
         ) {
-            // Title + pin button
+            // Title + pin button. The pin icon is a fixed-size sibling of the weighted title, so
+            // cycling the pin never reflows the title. The state caption lives on its own row
+            // below (see next) rather than beside the icon, which used to shove the title sideways.
             Row(
-                Modifier.fillMaxWidth().padding(bottom = 18.dp),
+                Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Top,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
@@ -136,86 +130,57 @@ fun TaskDetailSheet(
                     color = tokens.neutrals.textPrimary.toColor(),
                     modifier = Modifier.weight(1f),
                 )
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Box(
-                        Modifier
-                            .size(40.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(tokens.neutrals.surface.toColor())
-                            .border(1.dp, tokens.neutrals.border.toColor(), RoundedCornerShape(12.dp))
-                            .clickable {
-                                // Mirror BoardViewModel.pinTask's cycle so the icon updates in place
-                                // even though the sheet stays open and the underlying task snapshot
-                                // does not recompose.
-                                localPinLevel = when {
-                                    localPinLevel == 0 -> 1
-                                    localPinLevel == 1 && item.task.isRecurring -> 2
-                                    else -> 0
-                                }
-                                pinStateLabel = when (localPinLevel) {
-                                    1 -> "Pinned"
-                                    2 -> "Protected pin"
-                                    else -> "Unpinned"
-                                }
-                                onPin()
-                            },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        when (localPinLevel) {
-                            0 -> MaterialSymbol(
-                                "push_pin",
-                                tokens.neutrals.textTertiary.toColor(),
-                                size = 21.sp,
-                                filled = false,
-                            )
-                            1 -> MaterialSymbol(
-                                "push_pin",
-                                tokens.neutrals.textPrimary.toColor(),
-                                size = 21.sp,
-                                filled = true,
-                            )
-                            2 -> {
-                                Box(contentAlignment = Alignment.Center) {
-                                    MaterialSymbol(
-                                        "push_pin",
-                                        tokens.neutrals.textPrimary.toColor(),
-                                        size = 21.sp,
-                                        filled = true,
-                                    )
-                                    MaterialSymbol(
-                                        "shield",
-                                        tokens.successAccent.toColor(),
-                                        size = 10.sp,
-                                        filled = true,
-                                        modifier = Modifier.align(Alignment.BottomEnd).padding(2.dp),
-                                    )
-                                }
+                Box(
+                    Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(tokens.neutrals.surface.toColor())
+                        .border(1.dp, tokens.neutrals.border.toColor(), RoundedCornerShape(12.dp))
+                        .clickable {
+                            // Mirror BoardViewModel.pinTask's cycle so the icon updates in place
+                            // even though the sheet stays open and the underlying task snapshot
+                            // does not recompose.
+                            localPinLevel = when {
+                                localPinLevel == 0 -> 1
+                                localPinLevel == 1 && item.task.isRecurring -> 2
+                                else -> 0
                             }
+                            onPin()
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    when (localPinLevel) {
+                        0 -> MaterialSymbol("push_pin", tokens.neutrals.textTertiary.toColor(), size = 21.sp, filled = false)
+                        1 -> MaterialSymbol("push_pin", tokens.neutrals.textPrimary.toColor(), size = 21.sp, filled = true)
+                        2 -> Box(contentAlignment = Alignment.Center) {
+                            MaterialSymbol("push_pin", tokens.neutrals.textPrimary.toColor(), size = 21.sp, filled = true)
+                            MaterialSymbol(
+                                "shield",
+                                tokens.successAccent.toColor(),
+                                size = 10.sp,
+                                filled = true,
+                                modifier = Modifier.align(Alignment.BottomEnd).padding(2.dp),
+                            )
                         }
                     }
-                    Text(
-                        when (localPinLevel) {
-                            0 -> "Not pinned"
-                            1 -> "Pinned (this instance)"
-                            2 -> "Protected pin (all occurrences)"
-                            else -> ""
-                        },
-                        color = tokens.neutrals.textTertiary.toColor(),
-                        fontSize = 11.sp,
-                    )
-                }
-                AnimatedVisibility(visible = pinStateLabel != null) {
-                    Text(
-                        pinStateLabel ?: "",
-                        color = tokens.neutrals.textTertiary.toColor(),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                    )
                 }
             }
+            // Current pin state, on its own full-width row and right-aligned under the icon, so its
+            // changing width ("Not pinned" vs "Protected pin (all occurrences)") never nudges the
+            // title or the pin icon. Updates instantly on tap, which is the discoverability cue.
+            Text(
+                when (localPinLevel) {
+                    0 -> "Not pinned"
+                    1 -> "Pinned (this instance)"
+                    2 -> "Protected pin (all occurrences)"
+                    else -> ""
+                },
+                modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 18.dp),
+                textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                color = tokens.neutrals.textTertiary.toColor(),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+            )
 
             // Bucket + priority chips
             Row(
