@@ -100,7 +100,7 @@ class TaskWriteService(
         val today = todayIso()
         // Optimistic: mark done and record the local "completed today" marker (never a Notion column).
         taskCache.upsert(cur.copy(isDone = true))
-        localState.upsert(TaskLocalState(pageId, mapping.id, completedOnIso = today, manualSortIndex = cur.manualSortIndex))
+        editLocalState(pageId, mapping.id) { it.copy(completedOnIso = today) }
 
         return try {
             notion.updatePage(pageId, NotionPropertyWriter.buildProperties(mapping, listOf(statusEdit)))
@@ -116,7 +116,7 @@ class TaskWriteService(
             )
         } catch (e: NotionException) {
             taskCache.upsert(cur) // roll back
-            localState.upsert(TaskLocalState(pageId, mapping.id, completedOnIso = null, manualSortIndex = cur.manualSortIndex))
+            editLocalState(pageId, mapping.id) { it.copy(completedOnIso = null) }
             WriteResult.Failure(e.message.orEmpty().ifBlank { "Could not complete the task. Please try again." })
         }
     }
@@ -125,7 +125,7 @@ class TaskWriteService(
     private suspend fun reopen(mapping: DatabaseMapping, cur: SiftTask, spawnedId: String?): WriteResult {
         return try {
             notion.updatePage(cur.pageId, NotionPropertyWriter.buildProperties(mapping, listOf(reopenStatusEdit(mapping))))
-            localState.upsert(TaskLocalState(cur.pageId, mapping.id, completedOnIso = null, manualSortIndex = cur.manualSortIndex))
+            editLocalState(cur.pageId, mapping.id) { it.copy(completedOnIso = null) }
             taskCache.upsert(cur.copy(isDone = false))
             if (spawnedId != null) {
                 runCatching { notion.archivePage(spawnedId, archived = true) }
@@ -204,10 +204,7 @@ class TaskWriteService(
     /** Manual drag order within a priority. Purely local state; no Notion write, no rollback. */
     suspend fun setManualOrder(mappingId: String, orderedPageIds: List<String>) {
         orderedPageIds.forEachIndexed { index, id ->
-            val existing = localState.get(id)
-            localState.upsert(
-                TaskLocalState(id, mappingId, completedOnIso = existing?.completedOnIso, manualSortIndex = index),
-            )
+            editLocalState(id, mappingId) { it.copy(manualSortIndex = index) }
         }
     }
 
@@ -374,6 +371,22 @@ class TaskWriteService(
 
     private suspend fun current(mapping: DatabaseMapping, pageId: String): SiftTask? =
         taskCache.tasksFor(mapping.id).firstOrNull { it.pageId == pageId }
+
+    /**
+     * Read-modify-write a page's local state so a targeted change (the completed marker, manual
+     * order) never clobbers the other Sift-only fields on the same record: pin level, protected,
+     * brain dump, label, review date, reschedule count. Building a fresh [TaskLocalState] here was
+     * dropping the pin (and protected/label/brain-dump flags) whenever a pinned task was completed,
+     * reopened, or reordered.
+     */
+    private suspend fun editLocalState(
+        pageId: String,
+        mappingId: String,
+        transform: (TaskLocalState) -> TaskLocalState,
+    ) {
+        val existing = localState.get(pageId) ?: TaskLocalState(pageId = pageId, mappingId = mappingId)
+        localState.upsert(transform(existing))
+    }
 
     private fun addFailureMessage(e: NotionException): String = when (e) {
         is NotionException.Unauthorized -> "Sift has lost access to your Notion workspace. Please reconnect in settings."
