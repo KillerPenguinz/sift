@@ -16,7 +16,7 @@ import com.ironclinicgym.sift.ui.theme.MaterialSymbolsOutline
  * theme/mapping and the icon picker, never hardcoded at a UI call site. Unknown names fall back
  * to a label glyph rather than breaking layout.
  */
-private val CODEPOINTS: Map<String, Char> = mapOf(
+internal val CODEPOINTS: Map<String, Char> = mapOf(
     // Priority urgency icons
     "bolt" to Char(0xea0b), "wb_sunny" to Char(0xe430), "wb_twilight" to Char(0xe1c6),
     "eco" to Char(0xea35), "event" to Char(0xe878), "bedtime" to Char(0xf159),
@@ -57,6 +57,7 @@ private val CODEPOINTS: Map<String, Char> = mapOf(
     "light_mode" to Char(0xe518), "notifications_active" to Char(0xe7f7),
     "priority_high" to Char(0xe645), "restart_alt" to Char(0xf053),
     "radio_button_checked" to Char(0xe837), "radio_button_unchecked" to Char(0xe836),
+    "camera" to Char(0xe3af),
 )
 
 /** Icon names offered when the user customizes a bucket. */
