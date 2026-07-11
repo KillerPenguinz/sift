@@ -57,6 +57,9 @@ fun SiftPagerScreen(
     var editingTask by remember { mutableStateOf<ProjectedItem?>(null) }
     var showMinimizedBar by remember { mutableStateOf(false) }
     var selectedBrainDumpItem by remember { mutableStateOf<ProjectedItem?>(null) }
+    // Set when the user backs out of the edit sheet, so the board reopens the detail sheet it came
+    // from instead of closing entirely.
+    var reopenDetailFor by remember { mutableStateOf<ProjectedItem?>(null) }
 
     Box(Modifier.fillMaxSize().background(tokens.neutrals.bg.toColor())) {
         HorizontalPager(
@@ -70,6 +73,8 @@ fun SiftPagerScreen(
                     onOpenPriority = onOpenPriority,
                     onOpenMenu = onOpenMenu,
                     onEditTask = { item -> editingTask = item },
+                    reopenDetailFor = reopenDetailFor,
+                    onDetailReopened = { reopenDetailFor = null },
                 )
                 1 -> BrainDumpScreen(
                     viewModel = viewModel,
@@ -129,16 +134,20 @@ fun SiftPagerScreen(
 
     val activeSettings = settings
     if ((showAddTask || editingTask != null) && activeSettings != null) {
+        val editing = editingTask
         AddTaskSheetV2(
             viewModel = viewModel,
             settings = activeSettings,
-            editing = editingTask,
+            editing = editing,
             onSaved = {
                 showAddTask = false
                 editingTask = null
                 showMinimizedBar = true
             },
             onDismiss = { showAddTask = false; editingTask = null },
+            // Edit is only ever launched from the task detail sheet; Back returns there instead of
+            // closing everything (swipe-down still fully dismisses via onDismiss).
+            onBack = editing?.let { item -> { editingTask = null; reopenDetailFor = item } },
         )
     }
 

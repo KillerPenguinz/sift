@@ -79,6 +79,12 @@ fun BoardScreen(
     onOpenPriority: (String) -> Unit,
     onOpenMenu: () -> Unit,
     onEditTask: (com.ironclinicgym.sift.core.board.ProjectedItem) -> Unit = {},
+    /**
+     * When set, reopen the task detail sheet for this item. Used to return to the detail view
+     * after the user backs out of the edit sheet (which was launched from that detail view).
+     */
+    reopenDetailFor: com.ironclinicgym.sift.core.board.ProjectedItem? = null,
+    onDetailReopened: () -> Unit = {},
 ) {
     val projection by viewModel.projection.collectAsStateWithLifecycle()
     val label by viewModel.boardLabel.collectAsStateWithLifecycle()
@@ -97,6 +103,24 @@ fun BoardScreen(
     // label is the generic remove label, so a later unrelated undo (move, complete) never
     // picks up a stale title, and a later remove always overwrites it with the new title first.
     var pendingRemoveTitle by remember { mutableStateOf<String?>(null) }
+
+    // Reopen the detail sheet when the edit sheet is backed out of (Section 6: Back returns to the
+    // task view, not all the way out). The priority label is recomputed from current settings so an
+    // edit that changed the priority shows the right header.
+    LaunchedEffect(reopenDetailFor) {
+        reopenDetailFor?.let { item ->
+            // Prefer the freshest projection copy (keyed by page id) so an edit or a pin change made
+            // before backing out shows the current state, not the snapshot from when edit opened.
+            val fresh = projection?.let { p ->
+                (p.priorities.flatMap { it.items } + p.pinnedItems)
+                    .firstOrNull { it.task.pageId == item.task.pageId }
+            } ?: item
+            val pname = settings?.priorities
+                ?.firstOrNull { it.optionId == fresh.task.priorityOptionId }?.displayName.orEmpty()
+            selectedTask = fresh to pname
+            onDetailReopened()
+        }
+    }
 
     // Refresh when the board opens, so data is current without waiting on the background cycle.
     LaunchedEffect(Unit) { viewModel.refresh() }
