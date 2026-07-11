@@ -118,8 +118,8 @@ fun SettingsScreen(
                 onClick = onCustomize,
             )
             SettingsStepperRow(
-                title = "Tasks per bucket (single column)",
-                subtitle = "How many tasks show before plus N more. Two column view keeps its own limit.",
+                title = "Tasks per bucket",
+                subtitle = "How many tasks a single column shows before plus N more. Two column view keeps its own limit.",
                 icon = "format_list_numbered",
                 value = boardSettings?.singleColumnLimit ?: 8,
                 minValue = 4,
