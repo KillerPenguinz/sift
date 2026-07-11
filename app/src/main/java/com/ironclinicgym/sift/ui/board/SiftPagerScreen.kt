@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -60,7 +61,7 @@ fun SiftPagerScreen(
     Box(Modifier.fillMaxSize().background(tokens.neutrals.bg.toColor())) {
         HorizontalPager(
             state = pagerState,
-            modifier = Modifier.fillMaxSize().padding(bottom = 48.dp + navBarInset),
+            modifier = Modifier.fillMaxSize().padding(bottom = 64.dp + navBarInset),
         ) { page ->
             when (page) {
                 0 -> BoardScreen(
@@ -180,7 +181,7 @@ private fun SiftTabBar(
         Row(
             Modifier
                 .fillMaxWidth()
-                .height(52.dp),
+                .heightIn(min = 56.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
