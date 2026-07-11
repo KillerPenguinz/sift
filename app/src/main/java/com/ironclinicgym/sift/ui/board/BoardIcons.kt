@@ -15,6 +15,12 @@ import com.ironclinicgym.sift.ui.theme.MaterialSymbolsOutline
  * font does not resolve ligatures, which showed the literal names). Names come from the
  * theme/mapping and the icon picker, never hardcoded at a UI call site. Unknown names fall back
  * to a label glyph rather than breaking layout.
+ *
+ * Codepoints are the Material Symbols Rounded PUA values (a few reuse the legacy Material Icons
+ * slots the variable font still carries). The bundled font at res/font/material_symbols_rounded.ttf
+ * is a SUBSET: whenever you add an entry here you MUST regenerate the subset from the full variable
+ * font so the new glyph is actually present, or it renders as a tofu box. BoardIconsFontTest guards
+ * both failure modes (missing glyph, and a referenced name absent from this map) in CI.
  */
 internal val CODEPOINTS: Map<String, Char> = mapOf(
     // Priority urgency icons
