@@ -56,6 +56,7 @@ private val CODEPOINTS: Map<String, Char> = mapOf(
     "format_list_numbered" to Char(0xe242), "help" to Char(0xe887), "label_off" to Char(0xe9b6),
     "light_mode" to Char(0xe518), "notifications_active" to Char(0xe7f7),
     "priority_high" to Char(0xe645), "restart_alt" to Char(0xf053),
+    "radio_button_checked" to Char(0xe837), "radio_button_unchecked" to Char(0xe836),
 )
 
 /** Icon names offered when the user customizes a bucket. */
