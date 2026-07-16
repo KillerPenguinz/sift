@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+
 package com.ironclinicgym.sift.ui.board
 
 import androidx.compose.animation.AnimatedContent
@@ -11,6 +13,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -216,7 +219,9 @@ private fun NotificationBarContent(
                     color = tokens.neutrals.textPrimary.toColor(),
                     fontSize = 14.5.sp,
                     fontWeight = FontWeight.Medium,
-                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    // One-line slot: scroll a long message rather than clip it.
+                    modifier = Modifier.weight(1f).basicMarquee(),
                 )
                 MaterialSymbol(
                     "close",
@@ -238,7 +243,9 @@ private fun NotificationBarContent(
                     color = tokens.neutrals.textPrimary.toColor(),
                     fontSize = 14.5.sp,
                     fontWeight = FontWeight.Medium,
-                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    // The subheader slot is one line tall, so a long nudge would clip. Scroll it.
+                    modifier = Modifier.weight(1f).basicMarquee(),
                 )
                 Text(
                     variant.actionLabel,

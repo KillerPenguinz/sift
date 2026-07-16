@@ -99,6 +99,39 @@ class TaskWriteServiceTest {
     }
 
     @Test
+    fun `completing a pinned task keeps the pin, protected, and label through undo`() = runTest {
+        val transport = FakeTransport().on(HttpMethod.PATCH, "/pages/page-1", 200, """{"id":"page-1"}""")
+        val cache = FakeTaskCache().apply { tasks.value = listOf(taskFixture()) }
+        // The page carries Sift-only local state that must survive a complete + reopen cycle.
+        val local = FakeLocalStateStore().apply {
+            states.value = listOf(
+                com.ironclinicgym.sift.core.domain.ports.TaskLocalState(
+                    pageId = "page-1", mappingId = "m1",
+                    pinLevel = 2, isProtected = true, labelId = "lbl-1",
+                ),
+            )
+        }
+        val svc = service(transport, cache, local)
+
+        val result = svc.complete("page-1")
+        assertTrue(result is WriteResult.Success)
+        // Completing records the marker but must NOT wipe the pin, protected, or label.
+        val afterComplete = local.states.value.first { it.pageId == "page-1" }
+        assertEquals("2026-07-02", afterComplete.completedOnIso)
+        assertEquals(2, afterComplete.pinLevel)
+        assertTrue(afterComplete.isProtected)
+        assertEquals("lbl-1", afterComplete.labelId)
+
+        (result as WriteResult.Success).undo!!.inverse()
+        // Reopening clears the marker but still keeps the pin, protected, and label.
+        val afterUndo = local.states.value.first { it.pageId == "page-1" }
+        assertNull(afterUndo.completedOnIso)
+        assertEquals(2, afterUndo.pinLevel)
+        assertTrue(afterUndo.isProtected)
+        assertEquals("lbl-1", afterUndo.labelId)
+    }
+
+    @Test
     fun `completing a recurring task spawns the next occurrence`() = runTest {
         val transport = FakeTransport()
             .on(HttpMethod.PATCH, "/pages/page-1", 200, """{"id":"page-1"}""")

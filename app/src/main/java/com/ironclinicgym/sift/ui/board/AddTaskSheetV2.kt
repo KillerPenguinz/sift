@@ -32,6 +32,7 @@ import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -121,6 +122,12 @@ fun AddTaskSheetV2(
     editing: ProjectedItem?,
     onSaved: () -> Unit = {},
     onDismiss: () -> Unit,
+    /**
+     * When provided, the system Back button runs this instead of dismissing the sheet. The edit
+     * flow uses it to return to the task detail sheet it was launched from; swipe-down and the
+     * scrim still call [onDismiss] for a full close.
+     */
+    onBack: (() -> Unit)? = null,
 ) {
     val tokens = SiftTheme.tokens
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -285,6 +292,9 @@ fun AddTaskSheetV2(
         sheetState = sheetState,
         containerColor = tokens.neutrals.surfaceRaised.toColor(),
     ) {
+        // Inside the sheet content so this back handler wins over the sheet's own dismiss handler:
+        // Back returns to the detail sheet (edit flow) rather than closing everything.
+        onBack?.let { BackHandler(onBack = it) }
         Column(
             Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 24.dp),
         ) {
