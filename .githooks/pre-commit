@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+#
+# Sift pre-commit guard.
+#
+# Blocks two classes of mistakes before they ever enter git history:
+#   1. Files that must never be tracked (local caches, secret stores, keystores).
+#   2. Staged content that looks like a real credential (provider tokens, private keys).
+#
+# Activated via `git config core.hooksPath .githooks` (see scripts/setup-hooks.sh).
+# To bypass in a genuine false-positive case: `git commit --no-verify`.
+
+set -euo pipefail
+
+fail=0
+red()  { printf '\033[31m%s\033[0m\n' "$1"; }
+note() { printf '  %s\n' "$1"; }
+
+# --- 1. Path denylist -------------------------------------------------------
+# Anything matching these should be gitignored; if it is staged, something slipped.
+staged_paths="$(git diff --cached --name-only --diff-filter=AM || true)"
+
+# Directory/name patterns match anywhere in the path; suffix patterns are anchored.
+dir_regex='(^|/)(\.wrangler/|\.gradle/|build/)'                 # local caches, anywhere
+name_regex='(^|/)local\.properties$'                            # secret store, exact name
+suffix_regex='\.(keystore|jks|p12|pem|key)$'                    # key material, by extension
+while IFS= read -r path; do
+  [ -z "$path" ] && continue
+  # debug.keystore is intentionally allowed (matches the .gitignore exception).
+  case "$path" in */debug.keystore|debug.keystore) continue;; esac
+  if printf '%s\n' "$path" | grep -Eq "$dir_regex" \
+     || printf '%s\n' "$path" | grep -Eq "$name_regex" \
+     || printf '%s\n' "$path" | grep -Eq "$suffix_regex"; then
+    red "BLOCKED: '$path' must never be committed (local cache / secret / keystore)."
+    fail=1
+  fi
+done <<< "$staged_paths"
+
+# --- 2. Content secret scan -------------------------------------------------
+# High-confidence patterns only, to avoid blocking legitimate commits.
+# Real tokens are long; placeholders like ntn_xxx or Bearer tok_123 will not match.
+secret_regex='(ghp|gho|ghu|ghs)_[A-Za-z0-9]{36,}|ntn_[A-Za-z0-9]{40,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|xox[baprs]-[A-Za-z0-9-]{10,}'
+
+while IFS= read -r path; do
+  [ -z "$path" ] && continue
+  # Only scan text files that still exist in the working tree.
+  [ -f "$path" ] || continue
+  if git show ":$path" 2>/dev/null | grep -Eqn "$secret_regex"; then
+    red "BLOCKED: '$path' contains something that looks like a live credential."
+    note "Matched a token/private-key pattern. Move the value to local.properties or a secret binding."
+    fail=1
+  fi
+done <<< "$staged_paths"
+
+if [ "$fail" -ne 0 ]; then
+  echo
+  red "Commit rejected by .githooks/pre-commit."
+  note "Fix the above, or (only if you are certain it is a false positive) re-run with: git commit --no-verify"
+  exit 1
+fi
+
+exit 0

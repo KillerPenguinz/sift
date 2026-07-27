@@ -105,6 +105,21 @@ The OAuth token exchange is handled by the Cloudflare Worker in [`proxy/`](proxy
 [proxy/README.md](proxy/README.md) for deployment. The Notion client secret lives only as a
 Worker secret binding and never touches the app.
 
+### Keeping secrets out of git
+
+After cloning, activate the repository's guard hook once:
+
+```bash
+./scripts/setup-hooks.sh    # points core.hooksPath at .githooks
+```
+
+The [pre-commit hook](.githooks/pre-commit) refuses to commit local caches
+(`.wrangler/`, `.gradle/`, `build/`), the `local.properties` secret store, or key material
+(`*.keystore` except `debug.keystore`, `*.jks`, `*.p12`, `*.pem`, `*.key`), and scans staged
+content for live-looking credentials (provider tokens, private keys). If you ever hit a genuine
+false positive, commit with `--no-verify`. The public GitHub repo additionally has secret
+scanning with push protection enabled as a server-side backstop.
+
 ## License
 
 Sift is free software licensed under the GNU General Public License, version 3.0. See
