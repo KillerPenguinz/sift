@@ -1,7 +1,7 @@
 # Sift
 
 Sift turns any Notion database into an opinionated, urgency-bucketed task board on Android.
-Notion is the backend (API 2025-09-03). Open source, GPL 3.0, by BJ Nelson.
+Notion is the backend (API 2025-09-03). Open source, GPL 3.0.
 
 ## Current build status
 
@@ -135,13 +135,13 @@ These are out of scope. Claude Code must not implement any of these unprompted, 
 
 ## Testing convention
 
-Every acceptance criterion is tagged by testing tier. Claude Code owns [logic] and [ui-auto]; BJ owns [manual].
+Every acceptance criterion is tagged by testing tier. Claude Code owns [logic] and [ui-auto]; the maintainer owns [manual].
 
 - **[logic]** Fully autonomous. Write and run unit/integration tests. Pass/fail is unambiguous. Includes: domain functions, ViewModel state transitions, Notion write-layer payloads, mapping validation, string scanning, RRULE generation, date-to-priority bands.
 - **[ui-auto]** Partially autonomous. Compose UI tests asserting element presence/absence/tap response. Cannot judge visual appearance. Catches "element is missing" but not "element looks wrong."
 - **[manual]** Human only. Visual correctness, animation feel, real-device behavior, color/spacing judgment.
 
-**Standing instruction:** For every item implemented, write the [logic] tests as you build. Mark an item done only when its logic tests pass. At the end of a session, produce a Build Report with: what was implemented, test results (X of Y pass), every [manual] item listed separately for BJ's review, anything that could not be verified and why, and any assumptions made (flag, never decide silently).
+**Standing instruction:** For every item implemented, write the [logic] tests as you build. Mark an item done only when its logic tests pass. At the end of a session, produce a Build Report with: what was implemented, test results (X of Y pass), every [manual] item listed separately for the maintainer's review, anything that could not be verified and why, and any assumptions made (flag, never decide silently).
 
 ## Build commands
 
