@@ -19,3 +19,7 @@ build/
 
 # Raw design exports (not source-controlled)
 /design/
+
+# Wrangler local cache (contains Cloudflare account id; not source-controlled)
+.wrangler/
+proxy/.wrangler/
