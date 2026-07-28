@@ -1,0 +1,14 @@
+{
+  "blockedBy": [
+    "T-011"
+  ],
+  "completedDate": null,
+  "createdDate": "2026-07-28",
+  "description": "Map a watch action to the correct Notion space (bucket, priority, or brain dump) through the existing mapping layer.",
+  "id": "T-013",
+  "order": 40,
+  "phase": "p4",
+  "status": "open",
+  "title": "Watch action to Notion space routing",
+  "type": "task"
+}

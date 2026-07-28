@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-07-28",
+  "description": "Show Notion page comments; needs the Read-comments capability and a re-auth.",
+  "id": "T-029",
+  "order": 80,
+  "phase": "backlog",
+  "status": "open",
+  "title": "Notion comments in task detail",
+  "type": "task"
+}

@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-07-28",
+  "description": "Organize brain dump items using the existing labels system.",
+  "id": "T-035",
+  "order": 140,
+  "phase": "backlog",
+  "status": "open",
+  "title": "Brain dump categories and tags",
+  "type": "feature"
+}

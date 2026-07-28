@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-07-28",
+  "description": "Lock scope, the phone-as-bridge architecture, MVP cut, and the AI follow-up and clarification UX for the watch. Open questions: on-device vs backend AI, the button map, offline queueing.",
+  "id": "T-010",
+  "order": 10,
+  "phase": "p4",
+  "status": "open",
+  "title": "Spec Phase 4: AI capture and Pebble architecture",
+  "type": "feature"
+}

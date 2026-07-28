@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-07-28",
+  "description": "Later today, tomorrow, next week, and next month defaults are hardcoded in TimeFormat with a not-yet-wired comment. Read them from Settings so the configurable claim in CLAUDE.md holds.",
+  "id": "T-009",
+  "order": 50,
+  "phase": "p35",
+  "status": "open",
+  "title": "Wire quick-date defaults to Settings",
+  "type": "task"
+}

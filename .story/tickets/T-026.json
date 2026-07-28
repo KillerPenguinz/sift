@@ -1,0 +1,15 @@
+{
+  "blockedBy": [
+    "T-025",
+    "T-024"
+  ],
+  "completedDate": null,
+  "createdDate": "2026-07-28",
+  "description": "Write the how-to for using multiple databases on the free tier and add an in-app note pointing to it.",
+  "id": "T-026",
+  "order": 50,
+  "phase": "backlog",
+  "status": "open",
+  "title": "Multi-database DIY support article and in-app note",
+  "type": "chore"
+}

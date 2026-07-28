@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-07-28",
+  "description": "Read and write across more than one Notion database. MappingSet already holds a list of mappings so this is additive.",
+  "id": "T-024",
+  "order": 30,
+  "phase": "backlog",
+  "status": "open",
+  "title": "Multi-database consolidation",
+  "type": "feature"
+}

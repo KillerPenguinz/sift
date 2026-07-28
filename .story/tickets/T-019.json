@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-07-28",
+  "description": "Pricing, IAP, and the Supporter tier gating.",
+  "id": "T-019",
+  "order": 10,
+  "phase": "p6",
+  "status": "open",
+  "title": "Supporter tier and in-app purchase",
+  "type": "feature"
+}

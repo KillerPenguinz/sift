@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-07-28",
+  "description": "Home-screen widget built with Glance.",
+  "id": "T-018",
+  "order": 10,
+  "phase": "p5",
+  "status": "open",
+  "title": "Glance home-screen widget",
+  "type": "feature"
+}

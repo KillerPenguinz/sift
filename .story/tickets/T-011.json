@@ -1,0 +1,14 @@
+{
+  "blockedBy": [
+    "T-010"
+  ],
+  "completedDate": null,
+  "createdDate": "2026-07-28",
+  "description": "BLE AppMessage transport between the Pebble Watch 2 and the Sift Android app, which holds the Notion connection.",
+  "id": "T-011",
+  "order": 20,
+  "phase": "p4",
+  "status": "open",
+  "title": "PebbleKit Android bridge",
+  "type": "task"
+}

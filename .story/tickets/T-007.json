@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-07-28",
+  "description": "Replace the static added-to-priority message with a non-blocking chip that offers a Change action and self-quiets after repeated uncorrected saves, restorable in Settings. PHASE_3_5_SPEC section 4.",
+  "id": "T-007",
+  "order": 30,
+  "phase": "p35",
+  "status": "open",
+  "title": "Self-quieting Added-to-priority Change chip",
+  "type": "feature"
+}

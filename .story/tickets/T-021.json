@@ -1,0 +1,14 @@
+{
+  "blockedBy": [
+    "T-010"
+  ],
+  "completedDate": null,
+  "createdDate": "2026-07-28",
+  "description": "AI coach layer that builds on the Phase 4 capture and AI foundation.",
+  "id": "T-021",
+  "order": 10,
+  "phase": "p7",
+  "status": "open",
+  "title": "AI coach",
+  "type": "feature"
+}

@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-07-28",
+  "description": "Let users choose swipe action directions. A coming-soon settings placeholder already exists.",
+  "id": "T-031",
+  "order": 100,
+  "phase": "backlog",
+  "status": "open",
+  "title": "Customizable swipe direction assignments",
+  "type": "task"
+}

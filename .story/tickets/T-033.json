@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-07-28",
+  "description": "AddTaskSheet.kt is superseded by AddTaskSheetV2 and no longer referenced. Remove it.",
+  "id": "T-033",
+  "order": 120,
+  "phase": "backlog",
+  "status": "open",
+  "title": "Remove dead AddTaskSheet V1",
+  "type": "chore"
+}

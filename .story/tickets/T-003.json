@@ -1,0 +1,13 @@
+{
+  "blockedBy": [],
+  "completedDate": "2026-07-27",
+  "createdDate": "2026-07-28",
+  "description": "The color-coded, app-controlled priority grid rendering mapped tasks, read only. Complete and verified.",
+  "displayId": "T-003",
+  "id": "T-003",
+  "order": 10,
+  "phase": "p2",
+  "status": "complete",
+  "title": "Phase 2: priority grid and read rendering",
+  "type": "chore"
+}

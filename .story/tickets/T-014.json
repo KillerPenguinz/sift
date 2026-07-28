@@ -1,0 +1,14 @@
+{
+  "blockedBy": [
+    "T-010"
+  ],
+  "completedDate": null,
+  "createdDate": "2026-07-28",
+  "description": "Parse dictated or typed text into a dated and bucketed task or a brain dump item.",
+  "id": "T-014",
+  "order": 50,
+  "phase": "p4",
+  "status": "open",
+  "title": "AI natural-language capture",
+  "type": "feature"
+}

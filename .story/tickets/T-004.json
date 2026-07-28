@@ -1,0 +1,13 @@
+{
+  "blockedBy": [],
+  "completedDate": "2026-07-27",
+  "createdDate": "2026-07-28",
+  "description": "Add, edit, complete, remove, move, recurrence, snooze, and undo through the core write service. Complete and verified.",
+  "displayId": "T-004",
+  "id": "T-004",
+  "order": 10,
+  "phase": "p3",
+  "status": "complete",
+  "title": "Phase 3: write-back layer",
+  "type": "chore"
+}

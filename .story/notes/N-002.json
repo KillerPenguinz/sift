@@ -1,0 +1,13 @@
+{
+  "content": "Phase 4 Pebble Watch 2 vision (BJ, 2026-07-27): a companion that lets an on-watch action (button press, combo) route and log to the appropriate Notion space via Sift's mapping and two-axis foundation. Inspiration is Pebble's index quick-capture, on a broader base. With watch plus AI: surface follow-up actions, questions, and clarifications the user scrolls with the buttons (defined answers plus an Other free-text, like Claude Code option lists), and speech-to-text to talk to the watch and have it act. Architecture assumption: watch is a thin BLE client; the Sift Android app is the bridge (PebbleKit AppMessage) holding the Notion connection and running the AI capture. This expands CLAUDE.md Phase 4 beyond 'AI capture, unspec'd' and should be mirrored into the Notion Phase Tracker.",
+  "createdDate": "2026-07-28",
+  "id": "N-002",
+  "status": "active",
+  "tags": [
+    "phase4",
+    "pebble",
+    "decision"
+  ],
+  "title": null,
+  "updatedDate": "2026-07-28"
+}

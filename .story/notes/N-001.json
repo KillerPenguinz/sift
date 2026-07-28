@@ -1,0 +1,12 @@
+{
+  "content": "Rejected for now: complete/delete as a dual-swipe inside the task detail drawer. Decided against because it risks confusion with the board-level swipe gestures (right=complete, left=snooze). The task detail uses a prominent standalone Complete button instead; edit and remove are secondary. Revisit only if the board swipe model changes.",
+  "createdDate": "2026-07-28",
+  "id": "N-001",
+  "status": "active",
+  "tags": [
+    "decision",
+    "rejected"
+  ],
+  "title": null,
+  "updatedDate": "2026-07-28"
+}

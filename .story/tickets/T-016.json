@@ -1,0 +1,15 @@
+{
+  "blockedBy": [
+    "T-011",
+    "T-014"
+  ],
+  "completedDate": null,
+  "createdDate": "2026-07-28",
+  "description": "Surface follow-up questions and clarifications the user scrolls with the watch buttons: defined answers plus an Other free-text option.",
+  "id": "T-016",
+  "order": 70,
+  "phase": "p4",
+  "status": "open",
+  "title": "AI follow-up and clarification flow on watch",
+  "type": "feature"
+}

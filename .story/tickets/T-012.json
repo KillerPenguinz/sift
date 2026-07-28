@@ -1,0 +1,14 @@
+{
+  "blockedBy": [
+    "T-011"
+  ],
+  "completedDate": null,
+  "createdDate": "2026-07-28",
+  "description": "Thin watch app that captures actions via button presses and combos and hands them to the phone bridge.",
+  "id": "T-012",
+  "order": 30,
+  "phase": "p4",
+  "status": "open",
+  "title": "Pebble Watch 2 quick-capture app",
+  "type": "feature"
+}

@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-07-28",
+  "description": "Five themes exist in core but there is no switcher UI. The light and dark toggle is already built and is separate.",
+  "id": "T-028",
+  "order": 70,
+  "phase": "backlog",
+  "status": "open",
+  "title": "Theme switcher UI for the five themes",
+  "type": "task"
+}

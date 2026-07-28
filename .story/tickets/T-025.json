@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-07-28",
+  "description": "Settings and onboarding link to support URLs in SupportUrls.kt that are dead today. Build the FAQ site, starting with the Notion email reminders article.",
+  "id": "T-025",
+  "order": 40,
+  "phase": "backlog",
+  "status": "open",
+  "title": "Stand up support.siftapp.com",
+  "type": "chore"
+}

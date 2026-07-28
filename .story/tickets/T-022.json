@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-07-28",
+  "description": "Reminders and notifications. Own scope, not yet specced.",
+  "id": "T-022",
+  "order": 10,
+  "phase": "backlog",
+  "status": "open",
+  "title": "Push notifications and reminders",
+  "type": "feature"
+}

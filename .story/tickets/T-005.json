@@ -1,0 +1,13 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-07-28",
+  "description": "Run the tagged acceptance criteria on device and sign off the Two Axis Model; log any new bugs as issues.",
+  "displayId": "T-005",
+  "id": "T-005",
+  "order": 10,
+  "phase": "p35",
+  "status": "inprogress",
+  "title": "On-device UAT round 3 and Phase 3.5 sign-off",
+  "type": "task"
+}

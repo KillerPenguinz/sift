@@ -1,0 +1,14 @@
+{
+  "blockedBy": [
+    "T-013"
+  ],
+  "completedDate": null,
+  "createdDate": "2026-07-28",
+  "description": "Log and attribute actions that originate from the watch.",
+  "id": "T-017",
+  "order": 80,
+  "phase": "p4",
+  "status": "open",
+  "title": "Watch-originated action logging and provenance",
+  "type": "task"
+}

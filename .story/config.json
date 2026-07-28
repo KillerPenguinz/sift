@@ -1,0 +1,25 @@
+{
+  "features": {
+    "handovers": true,
+    "issues": true,
+    "reviews": true,
+    "roadmap": true,
+    "tickets": true
+  },
+  "language": "kotlin",
+  "project": "Sift",
+  "schemaVersion": 2,
+  "type": "gradle",
+  "version": 2,
+  "recipeOverrides": {
+    "maxTicketsPerSession": 0,
+    "reviewBackends": [
+      "lenses",
+      "agent"
+    ],
+    "codexReviewBackends": [
+      "lenses"
+    ],
+    "handoverInterval": 3
+  }
+}

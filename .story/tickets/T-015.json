@@ -1,0 +1,15 @@
+{
+  "blockedBy": [
+    "T-011",
+    "T-014"
+  ],
+  "completedDate": null,
+  "createdDate": "2026-07-28",
+  "description": "Voice capture on phone and via the watch, feeding the AI capture pipeline.",
+  "id": "T-015",
+  "order": 60,
+  "phase": "p4",
+  "status": "open",
+  "title": "Speech-to-text dictation on phone and watch",
+  "type": "task"
+}

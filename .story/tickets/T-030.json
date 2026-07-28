@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-07-28",
+  "description": "Last sync time is in memory only; persist it so it survives a cold start.",
+  "id": "T-030",
+  "order": 90,
+  "phase": "backlog",
+  "status": "open",
+  "title": "Persisted last-sync time across cold start",
+  "type": "task"
+}

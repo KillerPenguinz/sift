@@ -1,0 +1,67 @@
+{
+  "blockers": [],
+  "date": "2026-07-28",
+  "phases": [
+    {
+      "description": "Token-driven theme and color system (five themes, Paper default), KMP-ready in core.",
+      "id": "p0",
+      "label": "PHASE 0",
+      "name": "Theming"
+    },
+    {
+      "description": "OAuth onboarding and the role-to-property mapping layer that every read and write goes through.",
+      "id": "p1",
+      "label": "PHASE 1",
+      "name": "Onboarding and mapping"
+    },
+    {
+      "description": "Priority grid and read-only rendering of the mapped Notion tasks.",
+      "id": "p2",
+      "label": "PHASE 2",
+      "name": "Read grid"
+    },
+    {
+      "description": "Write-back: add, edit, complete, remove, move, recurrence, snooze, undo.",
+      "id": "p3",
+      "label": "PHASE 3",
+      "name": "Plain write layer"
+    },
+    {
+      "description": "Dates auto-assign priority; pinning is visibility; protected and blocked flags; brain dump; new add-task flow. Currently in UAT.",
+      "id": "p35",
+      "label": "PHASE 3.5",
+      "name": "Two Axis Model"
+    },
+    {
+      "description": "Natural-language capture plus a Pebble Watch 2 companion that routes on-watch actions to the mapped Notion space, with AI follow-ups and speech-to-text.",
+      "id": "p4",
+      "label": "PHASE 4",
+      "name": "AI capture and Pebble companion"
+    },
+    {
+      "description": "Glance home-screen widget.",
+      "id": "p5",
+      "label": "PHASE 5",
+      "name": "Home screen widget"
+    },
+    {
+      "description": "Pricing, in-app purchase, Supporter tier, and personalization.",
+      "id": "p6",
+      "label": "PHASE 6",
+      "name": "Supporter tier"
+    },
+    {
+      "description": "AI coach layer.",
+      "id": "p7",
+      "label": "PHASE 7",
+      "name": "AI coach"
+    },
+    {
+      "description": "Deferred and cross-cutting work without a dedicated phase home.",
+      "id": "backlog",
+      "label": "BACKLOG",
+      "name": "Cross-cutting backlog"
+    }
+  ],
+  "title": "Sift"
+}

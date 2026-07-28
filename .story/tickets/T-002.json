@@ -1,0 +1,13 @@
+{
+  "blockedBy": [],
+  "completedDate": "2026-07-27",
+  "createdDate": "2026-07-28",
+  "description": "Onboarding through two doors converging on one mapping; every read and write resolves through it by property id. Complete and verified.",
+  "displayId": "T-002",
+  "id": "T-002",
+  "order": 10,
+  "phase": "p1",
+  "status": "complete",
+  "title": "Phase 1: OAuth onboarding and mapping layer",
+  "type": "chore"
+}

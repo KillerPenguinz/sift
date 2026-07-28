@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-07-28",
+  "description": "Confirm the bring-your-own path shows a consent prompt before adding Sift-prefixed recurrence columns, per hard constraint 9.",
+  "id": "T-034",
+  "order": 130,
+  "phase": "backlog",
+  "status": "open",
+  "title": "Verify BYO consent prompt for Sift-prefixed recurrence columns",
+  "type": "task"
+}

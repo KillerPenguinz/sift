@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-07-28",
+  "description": "Future, requires a backend.",
+  "id": "T-027",
+  "order": 60,
+  "phase": "backlog",
+  "status": "open",
+  "title": "Leaderboards and gamification",
+  "type": "feature"
+}

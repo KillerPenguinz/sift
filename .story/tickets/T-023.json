@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-07-28",
+  "description": "Deliberately deferred for complexity risk.",
+  "id": "T-023",
+  "order": 20,
+  "phase": "backlog",
+  "status": "open",
+  "title": "Sub-tasks",
+  "type": "feature"
+}

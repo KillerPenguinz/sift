@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-07-28",
+  "description": "A mission control for the day: overview, coaching, calendar, and a landing spot for daily briefing check-ins. Resolved as its own feature; could land before Phase 7.",
+  "id": "T-032",
+  "order": 110,
+  "phase": "backlog",
+  "status": "open",
+  "title": "Daily Briefing Space",
+  "type": "feature"
+}

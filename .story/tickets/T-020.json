@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-07-28",
+  "description": "Collect a name in onboarding and show it in the header, for example the user tasks and the user brain dump.",
+  "id": "T-020",
+  "order": 20,
+  "phase": "p6",
+  "status": "open",
+  "title": "Personalized header with user name",
+  "type": "task"
+}
