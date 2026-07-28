@@ -21,10 +21,11 @@ There is no architectural fork. All three follow patterns already in the codebas
 the real decisions were UX ones, recorded below. Each slots into an existing seam:
 
 - Blocked reuses the local-flag pattern of `isProtected` / `isBrainDump`.
-- Both settings follow the existing chain:
-  `BoardSettings` (per-mapping DataStore blob) -> `BoardSettingsEdits`
-  -> `CustomizeViewModel` -> `SettingsScreen`. New JSON fields decode to their
-  defaults for existing users on upgrade (the documented forward-compat pattern).
+- Both settings follow the existing edit chain: `BoardSettingsEdits`
+  -> `CustomizeViewModel` -> `SettingsScreen`. New fields decode to their defaults
+  for existing users on upgrade (the documented forward-compat pattern). Their
+  storage scope differs from the per-mapping default and is described in
+  "Settings scope" below.
 
 Standing constraints (from CLAUDE.md) that apply throughout: no em dashes or
 hyphens in user-facing text; token discipline (no hardcoded colors);
@@ -41,6 +42,45 @@ writes go through the stored mapping.
    / tomorrow bands stay fixed. No gaps or overlaps possible by construction.
 3. **Sign-off:** Phase 3.5 sign-off comes after the three builds and is gated on
    BJ's on-device pass of the UAT round 3 script.
+4. **Settings scope (T-008 + T-009):** global by default, with a toggle to make a
+   given database use its own values. See "Settings scope" below.
+
+## Settings scope: global default with per-database override
+
+The date bands (T-008) and quick-date defaults (T-009) are user-tuning of priority
+behavior, and most people want one consistent behavior everywhere. So these settings
+are **global by default**, with an explicit **per-database override** for the power
+user who wants a database to differ.
+
+**Model:**
+- A `PrioritySettings` group holds all of it: `soonMaxDays`, `laterMaxDays`,
+  `tomorrowTime`, `nextWeekTime`, `nextMonthTime`, `firstDayOfWeek`.
+- One canonical `PrioritySettings` is persisted in a **global** DataStore
+  (not mapping-keyed), following the existing global-prefs pattern used by
+  `AppPreferencesDataStore` (theme mode).
+- Each database's `BoardSettings` gains `useGlobalPrioritySettings: Boolean = true`
+  and an optional `prioritySettingsOverride: PrioritySettings? = null`.
+- A pure resolver `resolvePrioritySettings(global, boardSettings)` returns the
+  effective group: the global values when `useGlobalPrioritySettings` is true,
+  otherwise the override (seeded from global at the moment the toggle is turned on).
+
+**Behavior:**
+- Default (toggle off / "use global"): editing a band or time in Settings writes the
+  global store and applies to every database.
+- Power user (toggle on / "customize for this database"): the current global values
+  are copied into this database's override, and further edits write only that
+  override. Turning the toggle back off reverts the database to global (the override
+  is ignored, not deleted).
+
+**Settings UI:** a "Priority timing" section headed by the scope toggle
+("Use the same settings across all databases", default on). The band steppers
+(Component 2) and quick-date controls (Component 3) render under it and write to
+whichever scope the toggle selects.
+
+**Wiring:** `BoardViewModel` combines the global `PrioritySettings` flow with the
+per-mapping `BoardSettings` flow, runs `resolvePrioritySettings`, and feeds the
+result into `TwoAxisPolicy` (bands) and the quick-date chip values. It recomputes
+when either flow emits, so edits and scope flips take effect without a restart.
 
 ## Component 1 — T-006: Blocked flag UI
 
@@ -90,23 +130,25 @@ SOON 2..8 (up to 7 days) and LATER 8..31 (up to 30 days). So `soonMaxDays = 7` m
 to SOON end 8, and `laterMaxDays = 30` maps to LATER end 31; LATER start tracks
 SOON end.
 
-**Settings storage:** two new `BoardSettings` ints, `soonMaxDays = 7` and
-`laterMaxDays = 30`, with clamped `setSoonMaxDays` / `setLaterMaxDays` extensions in
-`BoardSettingsEdits.kt` and matching `CustomizeViewModel` methods.
+**Settings storage:** `soonMaxDays = 7` and `laterMaxDays = 30` live on the
+`PrioritySettings` group (see "Settings scope"), not directly on `BoardSettings`.
+Clamped edit functions write to whichever scope the toggle selects, via
+`CustomizeViewModel`.
 
-**Settings UI:** a "How dates set priority" section in `SettingsScreen.kt` with two
-steppers: "Soon: up to N days" and "Later: up to M days" (reuse the existing stepper
-component).
+**Settings UI:** two steppers under the "Priority timing" section, "Soon: up to N
+days" and "Later: up to M days" (reuse the existing stepper component).
 
 **Wiring:** `BoardViewModel` (currently `TwoAxisPolicy()` at line 98, hardcoded
 default) builds `TwoAxisPolicy(config = DateBandConfig.fromBoundaries(...))` from the
-live `BoardSettings`, and rebuilds the policy when settings change so edits take
-effect without an app restart.
+resolved effective `PrioritySettings`, and rebuilds the policy when the effective
+settings change so edits and scope flips take effect without an app restart.
 
 **Tests:**
 - [logic] `fromBoundaries` produces the correct bands; `resolveBand` with a tuned
   config returns the tuned priorities; clamping rejects/repairs invalid input
   (later <= soon).
+- [logic] `resolvePrioritySettings` returns global when the flag is set and the
+  override otherwise.
 - [ui-auto] both steppers present in Settings.
 
 ## Component 3 — T-009: Quick-date defaults to Settings
@@ -115,10 +157,15 @@ effect without an app restart.
 tomorrow = 8:00, next week = Sunday 8:00, next month = 1st of next month 8:00, with a
 "not-yet-wired" comment on next week.
 
-**Settings storage:** new `BoardSettings` fields matching the Round-2 tagged criteria:
-default time for **tomorrow**, **next week**, **next month** (each defaulting to 8:00),
-and **first day of week** (default Sunday). `use24HourTime` already exists and is
-unchanged. Times stored as minute-of-day (or hour/minute) ints.
+**Settings storage:** on the `PrioritySettings` group (see "Settings scope"),
+matching the Round-2 tagged criteria: default time for **tomorrow**, **next week**,
+**next month** (each defaulting to 8:00), and **first day of week** (default Sunday).
+`use24HourTime` stays a separate per-mapping `BoardSettings` field, unchanged.
+
+**Time semantics:** each default time is a **local time-of-day**, not an absolute
+instant. "Tomorrow" means tomorrow's calendar date at 08:00 in the user's local time
+(a device set to 08:00 local produces 08:00 local wherever the user is). Times stored
+as hour/minute (or minute-of-day) ints and applied to the target local date.
 
 **Core:** thread these into `TimeFormat.quickDateTomorrow` / `quickDateNextWeek` /
 `quickDateNextMonth` as parameters, removing the not-yet-wired comment.
@@ -153,12 +200,11 @@ pass of the script.
 
 ## Assumptions (flagged, not decided silently)
 
-1. The three per-action default times are stored as three separate settings to match
+1. The three per-action default times are stored as three separate fields to match
    the Round-2 criteria literally, even though all default to 8:00. Could be collapsed
    into one shared "default task time" if preferred.
-2. Settings are per-connected-database, because `BoardSettings` is already keyed to
-   the mapping id. Band and time preferences are therefore scoped to the mapping, not
-   global.
+2. (Resolved by the user) Priority-timing settings are global by default with a
+   per-database override toggle. See "Settings scope".
 
 ## Out of scope
 
