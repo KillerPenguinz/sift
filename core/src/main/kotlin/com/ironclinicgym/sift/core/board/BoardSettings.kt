@@ -95,6 +95,10 @@ data class BoardSettings(
     val asapInflationThreshold: Int = 5,
     /** Percentage of total tasks that are Protected before the saturation nudge fires. */
     val protectedInflationPercent: Int = 30,
+    /** True: this database uses the global priority-timing settings. False: uses [prioritySettingsOverride]. */
+    val useGlobalPrioritySettings: Boolean = true,
+    /** Per-database override; consulted only when [useGlobalPrioritySettings] is false. */
+    val prioritySettingsOverride: PrioritySettings? = null,
 ) {
     fun bucketFor(optionId: String?): BucketView =
         buckets.firstOrNull { it.optionId == optionId } ?: unsetBucket
