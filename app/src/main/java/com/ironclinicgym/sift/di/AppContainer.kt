@@ -26,8 +26,10 @@ import com.ironclinicgym.sift.core.mapping.MappingSet
 import com.ironclinicgym.sift.core.oauth.OAuthRequestFactory
 import com.ironclinicgym.sift.core.oauth.TokenBundle
 import com.ironclinicgym.sift.core.domain.ports.BoardSettingsStore
+import com.ironclinicgym.sift.core.domain.ports.PrioritySettingsStore
 import com.ironclinicgym.sift.data.local.AppPreferencesDataStore
 import com.ironclinicgym.sift.data.local.BoardSettingsDataStore
+import com.ironclinicgym.sift.data.local.PrioritySettingsDataStore
 import com.ironclinicgym.sift.data.local.MIGRATION_1_2
 import com.ironclinicgym.sift.data.local.MIGRATION_2_3
 import com.ironclinicgym.sift.data.local.MIGRATION_3_4
@@ -97,9 +99,11 @@ class AppContainer(context: Context) {
     // Concrete types kept for the debug reset (clearAll), exposed as ports elsewhere.
     private val recurrenceConsent = RecurrenceConsentDataStore(appContext)
     private val boardSettingsDataStore = BoardSettingsDataStore(appContext)
+    private val prioritySettingsDataStore = PrioritySettingsDataStore(appContext)
     val appPreferences = AppPreferencesDataStore(appContext)
 
     val boardSettingsStore: BoardSettingsStore = boardSettingsDataStore
+    val prioritySettingsStore: PrioritySettingsStore = prioritySettingsDataStore
 
     // Phase 3 write layer (all logic in core). The single active undo and recurrence engine are
     // process singletons so undo survives navigation and recurrence math is shared.
@@ -165,6 +169,7 @@ class AppContainer(context: Context) {
         tokenStore.clear()
         mappingStore.save(MappingSet.EMPTY)
         boardSettingsDataStore.clearAll()
+        prioritySettingsDataStore.clearAll()
         appPreferences.clearAll()
         recurrenceConsent.clearAll()
         withContext(Dispatchers.IO) { database.clearAllTables() }
