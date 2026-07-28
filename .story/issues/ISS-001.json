@@ -1,0 +1,24 @@
+{
+  "components": [
+    "core/board/DateBandEngine",
+    "core/domain/TwoAxisPolicy",
+    "app/ui/board/BoardViewModel",
+    "core/board/BoardProjection"
+  ],
+  "createdBy": "codex-review (via Claude)",
+  "dedupeKey": "phase35-review-2026-07-27:self-managing-dated-priorities",
+  "discoveredDate": "2026-07-28",
+  "id": "ISS-001",
+  "impact": "Phase 3.5 spec (sections 2-3, 9) requires a dated task's priority to auto-assign from its due date and auto-climb as the date nears. Verified during T-008 review: DateBandEngine.resolveBand is called in exactly one place, AddTaskSheetV2.resolvedPriority (task creation). BoardProjection groups by the stored priorityOptionId and never re-derives priority from the due date. TwoAxisPolicy.evaluateDateChange (the only DateBandConfig consumer) has NO call site. So: (1) date mutations after creation (snoozeToDate, promoteBrainDumpWithDate, removeDateAndMoveManual) do not recompute priority from bands; (2) existing dated tasks do not climb as their date nears (no day-rollover reprojection); (3) changing the configurable bands (T-008) does not re-place already-created tasks. Fix: move date-to-priority resolution into a core use case / write-service operation that accepts DateBandConfig and resolves the PriorityKey through the stored mapping, route every due-date mutation through it, and add rollover/boundary-change reconciliation. Out of scope for T-006/T-008/T-009 (which only expose and use the bands at creation); tracked here so Phase 3.5 sign-off accounts for it.",
+  "location": [],
+  "phase": "p35",
+  "relatedTickets": [
+    "T-008",
+    "T-005"
+  ],
+  "resolution": null,
+  "resolvedDate": null,
+  "severity": "high",
+  "status": "open",
+  "title": "Dated priorities are not self-managing across all date paths"
+}

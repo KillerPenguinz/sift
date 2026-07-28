@@ -136,8 +136,10 @@ git commit -m "feat(core): DateBandConfig.fromBoundaries for tunable Soon/Later 
 **Acceptance Criteria:**
 - [ ] `PrioritySettings()` defaults: soon 7, later 30, all times 08:00, firstDayOfWeek 7 (Sunday).
 - [ ] `setSoonMaxDays` / `setLaterMaxDays` keep `soon < later`; time/day setters clamp to valid ranges.
-- [ ] `resolvePrioritySettings` returns the global value when `useGlobalPrioritySettings` is true, and the override otherwise (falling back to global when the override is null).
-- [ ] `BoardSettings` gains `useGlobalPrioritySettings = true` and `prioritySettingsOverride = null` (absent JSON decodes to these defaults).
+- [ ] `resolvePrioritySettings` returns the global value when `useGlobalPrioritySettings` is true, and the override otherwise (falling back to global when the override is null), always `normalized()`.
+- [ ] `PrioritySettings.normalized()` clamps all fields into valid ranges.
+- [ ] `routePriorityEdit(board, global, transform)` returns `SaveGlobal` under global scope and `SaveBoard` (with the override set) under per-database scope.
+- [ ] `BoardSettings` gains `useGlobalPrioritySettings = true` and `prioritySettingsOverride = null` (absent JSON decodes to these defaults; legacy-JSON test proves it).
 
 **Verify:** `./gradlew :core:test --tests "*PrioritySettingsTest*"` -> all pass.
 
@@ -150,7 +152,7 @@ Create `core/src/test/kotlin/com/ironclinicgym/sift/core/board/PrioritySettingsT
 ```kotlin
 package com.ironclinicgym.sift.core.board
 
-import com.ironclinicgym.sift.core.mapping.DatabaseMapping
+import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -194,6 +196,43 @@ class PrioritySettingsTest {
     @Test fun `dateBandConfig delegates to fromBoundaries`() {
         val p = PrioritySettings(soonMaxDays = 4, laterMaxDays = 20)
         assertEquals(DateBandConfig.fromBoundaries(4, 20), p.dateBandConfig())
+    }
+
+    @Test fun `normalized clamps out of range values`() {
+        val bad = PrioritySettings(
+            soonMaxDays = 0, laterMaxDays = 0, tomorrowHour = 40, nextWeekMinute = -5, firstDayOfWeek = 12,
+        ).normalized()
+        assert(bad.soonMaxDays >= 2)
+        assert(bad.laterMaxDays > bad.soonMaxDays)
+        assertEquals(23, bad.tomorrowHour)
+        assertEquals(0, bad.nextWeekMinute)
+        assertEquals(7, bad.firstDayOfWeek)
+    }
+
+    @Test fun `legacy BoardSettings JSON decodes new fields to defaults`() {
+        val json = Json { ignoreUnknownKeys = true }
+        val legacy = """{"mappingId":"m1","priorities":[],"buckets":[]}"""
+        val decoded = json.decodeFromString(BoardSettings.serializer(), legacy)
+        assertEquals(true, decoded.useGlobalPrioritySettings)
+        assertEquals(null, decoded.prioritySettingsOverride)
+    }
+
+    @Test fun `resolver normalizes a malformed override`() {
+        val global = PrioritySettings()
+        val bad = PrioritySettings(tomorrowHour = 99)
+        assertEquals(23, resolvePrioritySettings(global, boardWith(false, bad)).tomorrowHour)
+    }
+
+    @Test fun `routePriorityEdit under global scope saves global`() {
+        val target = routePriorityEdit(boardWith(true, null), PrioritySettings()) { it.setSoonMaxDays(5) }
+        assertEquals(PriorityEdit.SaveGlobal(PrioritySettings(soonMaxDays = 5)), target)
+    }
+
+    @Test fun `routePriorityEdit under per-database scope saves the board override`() {
+        val board = boardWith(false, PrioritySettings())
+        val target = routePriorityEdit(board, PrioritySettings()) { it.setSoonMaxDays(5) }
+        assert(target is PriorityEdit.SaveBoard)
+        assertEquals(5, (target as PriorityEdit.SaveBoard).board.prioritySettingsOverride?.soonMaxDays)
     }
 }
 ```
@@ -262,9 +301,50 @@ fun PrioritySettings.setNextMonthTime(hour: Int, minute: Int): PrioritySettings 
 fun PrioritySettings.setFirstDayOfWeek(day: Int): PrioritySettings =
     copy(firstDayOfWeek = day.coerceIn(1, 7))
 
-/** Effective priority settings for a database: the global value unless it opts into an override. */
+/**
+ * Clamp every field into a valid range. Applied after decoding persisted JSON and inside
+ * [resolvePrioritySettings] so a malformed or future-written blob can never reach the UI or the
+ * quick-date helpers with an invalid hour, minute, day, or boundary.
+ */
+fun PrioritySettings.normalized(): PrioritySettings {
+    val soon = soonMaxDays.coerceIn(2, 363)
+    return copy(
+        soonMaxDays = soon,
+        laterMaxDays = laterMaxDays.coerceIn(soon + 1, 364),
+        tomorrowHour = tomorrowHour.coerceIn(0, 23),
+        tomorrowMinute = tomorrowMinute.coerceIn(0, 59),
+        nextWeekHour = nextWeekHour.coerceIn(0, 23),
+        nextWeekMinute = nextWeekMinute.coerceIn(0, 59),
+        nextMonthHour = nextMonthHour.coerceIn(0, 23),
+        nextMonthMinute = nextMonthMinute.coerceIn(0, 59),
+        firstDayOfWeek = firstDayOfWeek.coerceIn(1, 7),
+    )
+}
+
+/** Effective priority settings for a database: the global value unless it opts into an override. Always normalized. */
 fun resolvePrioritySettings(global: PrioritySettings, board: BoardSettings): PrioritySettings =
-    if (board.useGlobalPrioritySettings) global else (board.prioritySettingsOverride ?: global)
+    (if (board.useGlobalPrioritySettings) global else (board.prioritySettingsOverride ?: global)).normalized()
+
+/** Where a priority-timing edit must be persisted. */
+sealed interface PriorityEdit {
+    data class SaveGlobal(val global: PrioritySettings) : PriorityEdit
+    data class SaveBoard(val board: BoardSettings) : PriorityEdit
+}
+
+/**
+ * Pure routing for a priority-timing edit: apply [transform] to the current effective settings,
+ * then persist to the global store when the board follows global, or to the board's override
+ * otherwise. Extracted so the scope-routing decision is unit-testable without a ViewModel.
+ */
+fun routePriorityEdit(
+    board: BoardSettings,
+    global: PrioritySettings,
+    transform: (PrioritySettings) -> PrioritySettings,
+): PriorityEdit {
+    val updated = transform(resolvePrioritySettings(global, board))
+    return if (board.useGlobalPrioritySettings) PriorityEdit.SaveGlobal(updated)
+    else PriorityEdit.SaveBoard(board.setPrioritySettingsOverride(updated))
+}
 ```
 
 - [ ] **Step 4: Add fields to `BoardSettings`**
@@ -505,9 +585,11 @@ class PrioritySettingsDataStore(context: Context) : PrioritySettingsStore {
     }
 
     private fun decode(raw: String): PrioritySettings? =
-        runCatching { json.decodeFromString(PrioritySettings.serializer(), raw) }.getOrNull()
+        runCatching { json.decodeFromString(PrioritySettings.serializer(), raw).normalized() }.getOrNull()
 }
 ```
+
+(Import `com.ironclinicgym.sift.core.board.normalized` alongside `PrioritySettings`.)
 
 - [ ] **Step 2: Wire into `AppContainer.kt`**
 
@@ -570,17 +652,21 @@ git commit -m "feat(app): global PrioritySettings DataStore wired into AppContai
 In `CustomizeViewModel.kt`, add to the import block:
 
 ```kotlin
+import com.ironclinicgym.sift.core.board.PriorityEdit
 import com.ironclinicgym.sift.core.board.PrioritySettings
+import com.ironclinicgym.sift.core.board.normalized
 import com.ironclinicgym.sift.core.board.resolvePrioritySettings
+import com.ironclinicgym.sift.core.board.routePriorityEdit
 import com.ironclinicgym.sift.core.board.setFirstDayOfWeek
 import com.ironclinicgym.sift.core.board.setLaterMaxDays
 import com.ironclinicgym.sift.core.board.setNextMonthTime
 import com.ironclinicgym.sift.core.board.setNextWeekTime
-import com.ironclinicgym.sift.core.board.setPrioritySettingsOverride
 import com.ironclinicgym.sift.core.board.setSoonMaxDays
 import com.ironclinicgym.sift.core.board.setTomorrowTime
 import com.ironclinicgym.sift.core.board.setUseGlobalPrioritySettings
 import com.ironclinicgym.sift.core.domain.ports.PrioritySettingsStore
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 ```
 
 - [ ] **Step 2: Change the constructor**
@@ -602,6 +688,10 @@ class CustomizeViewModel(
 After the `unmapped` StateFlow (line 65), add:
 
 ```kotlin
+    // Serializes scope toggles and priority-timing edits so a toggle and the edits around it apply
+    // in order, and concurrent edits never overwrite one another (single ViewModel instance).
+    private val priorityEditMutex = Mutex()
+
     val globalPrioritySettings: StateFlow<PrioritySettings> = prioritySettingsStore.observe()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PrioritySettings.DEFAULT)
 
@@ -610,8 +700,19 @@ After the `unmapped` StateFlow (line 65), add:
         if (s == null) null else resolvePrioritySettings(g, s)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    fun setUseGlobalPrioritySettings(useGlobal: Boolean) =
-        edit { it.setUseGlobalPrioritySettings(useGlobal, globalPrioritySettings.value) }
+    fun setUseGlobalPrioritySettings(useGlobal: Boolean) {
+        val current = settings.value ?: return
+        viewModelScope.launch {
+            priorityEditMutex.withLock {
+                // Read BOTH authoritative values from their stores inside the lock: the StateFlows
+                // (settings, globalPrioritySettings) lag DataStore writes, so seeding an override
+                // from the flow could copy a stale global.
+                val board = store.load(current.mappingId) ?: current
+                val global = prioritySettingsStore.load().normalized()
+                store.save(board.setUseGlobalPrioritySettings(useGlobal, global))
+            }
+        }
+    }
 
     fun setSoonMaxDays(days: Int) = editPriority { it.setSoonMaxDays(days) }
     fun setLaterMaxDays(days: Int) = editPriority { it.setLaterMaxDays(days) }
@@ -620,16 +721,28 @@ After the `unmapped` StateFlow (line 65), add:
     fun setNextMonthTime(hour: Int, minute: Int) = editPriority { it.setNextMonthTime(hour, minute) }
     fun setFirstDayOfWeek(day: Int) = editPriority { it.setFirstDayOfWeek(day) }
 
-    /** Route a priority-timing edit to the active scope: the global store, or this database's override. */
+    /**
+     * Route a priority-timing edit to the active scope through the pure [routePriorityEdit], under
+     * the mutex. Reads BOTH authoritative values (board and global) from their stores inside the
+     * lock rather than from the lagging StateFlows, so back-to-back edits never transform a stale
+     * snapshot, and serializes concurrent edits so neither is lost.
+     */
     private fun editPriority(transform: (PrioritySettings) -> PrioritySettings) {
-        val board = settings.value ?: return
-        val updated = transform(resolvePrioritySettings(globalPrioritySettings.value, board))
+        val current = settings.value ?: return
         viewModelScope.launch {
-            if (board.useGlobalPrioritySettings) prioritySettingsStore.save(updated)
-            else store.save(board.setPrioritySettingsOverride(updated))
+            priorityEditMutex.withLock {
+                val board = store.load(current.mappingId) ?: current
+                val global = prioritySettingsStore.load().normalized()
+                when (val edit = routePriorityEdit(board, global, transform)) {
+                    is PriorityEdit.SaveGlobal -> prioritySettingsStore.save(edit.global)
+                    is PriorityEdit.SaveBoard -> store.save(edit.board)
+                }
+            }
         }
     }
 ```
+
+> **Ordering (required):** declare these members after the existing `settings` StateFlow (line 56) so the initializers resolve in order: `settings` -> `globalPrioritySettings` -> `effectivePriority` (which references both). The insertion point above (after `unmapped`, line 65) satisfies this. The pure routing decision is unit-tested in Task 2 (`routePriorityEdit`); the mutex guarantees ordering. Cross-ViewModel-instance races (two live settings screens) remain theoretically possible but are not a real scenario for a single settings surface, and a full atomic-store `update(transform)` refactor is deferred (tracked outside this batch).
 
 - [ ] **Step 4: Verify compile**
 
@@ -645,17 +758,19 @@ git commit -m "feat(app): scope-aware priority-timing edits in CustomizeViewMode
 
 ---
 
-### Task 6: BoardViewModel effective config wiring (app)
+### Task 6: BoardViewModel exposes effective PrioritySettings (app)
 
-**Goal:** Expose the effective `PrioritySettings` on `BoardViewModel` and rebuild `TwoAxisPolicy` from it so the safety-catch bands and the add-sheet both use the configured values without a restart.
+**Goal:** Expose the effective `PrioritySettings` on `BoardViewModel` for the add-task sheet.
+
+**Why no policy rebuild (verified):** `resolveBand` is only called at task creation (`AddTaskSheetV2.resolvedPriority`, wired in Task 7). The only `DateBandConfig` consumer inside `TwoAxisPolicy` is `evaluateDateChange`, which has NO call site anywhere in the app today. So rebuilding `twoAxisPolicy` from the config would be dead churn and add a needless mutable-state race. We therefore leave the injected `TwoAxisPolicy()` untouched and only expose the flow. If `evaluateDateChange` is wired later, build a policy from `effectivePrioritySettings.value.dateBandConfig()` at that call site.
 
 **Files:**
 - Modify: `app/src/main/java/com/ironclinicgym/sift/ui/board/BoardViewModel.kt` (constructor lines 79-103; add flow after the `settings` StateFlow near line 165)
 
 **Acceptance Criteria:**
 - [ ] Constructor takes `prioritySettingsStore: PrioritySettingsStore`, passed from the `AppContainer` constructor.
-- [ ] `twoAxisPolicy` is rebuilt whenever the effective priority settings change.
 - [ ] `effectivePrioritySettings: StateFlow<PrioritySettings>` is exposed for the add-task sheet.
+- [ ] The injected `twoAxisPolicy` parameter is unchanged (no rename, no mutable rebuild).
 
 **Verify:** `./gradlew :app:compileDebugKotlin` -> BUILD SUCCESSFUL.
 
@@ -671,9 +786,9 @@ import com.ironclinicgym.sift.core.board.resolvePrioritySettings
 import com.ironclinicgym.sift.core.domain.ports.PrioritySettingsStore
 ```
 
-- [ ] **Step 2: Change the constructor to accept the store and hold a rebuildable policy**
+- [ ] **Step 2: Add the store parameter (leave `twoAxisPolicy` as-is)**
 
-In the primary constructor (lines 79-90), replace `private val twoAxisPolicy: TwoAxisPolicy,` with `initialPolicy: TwoAxisPolicy,` and add the new store param. The header becomes:
+In the primary constructor (lines 79-90), add `prioritySettingsStore` as the last parameter. `twoAxisPolicy` stays `private val twoAxisPolicy: TwoAxisPolicy,` unchanged. The header becomes:
 
 ```kotlin
 class BoardViewModel(
@@ -682,7 +797,7 @@ class BoardViewModel(
     private val undoManager: UndoManager,
     private val recurrenceSetup: RecurrenceSetupService,
     private val appPreferences: AppPreferencesDataStore,
-    initialPolicy: TwoAxisPolicy,
+    private val twoAxisPolicy: TwoAxisPolicy,
     private val localStateStore: TaskLocalStateStore,
     private val notificationStore: NotificationStore,
     private val actionHistoryStore: ActionHistoryStore,
@@ -691,7 +806,7 @@ class BoardViewModel(
 ) : ViewModel() {
 ```
 
-In the secondary constructor (lines 92-103), keep `TwoAxisPolicy()` and add the store at the end:
+In the secondary constructor (lines 92-103), add `container.prioritySettingsStore` as the last argument:
 
 ```kotlin
     constructor(container: AppContainer) : this(
@@ -709,17 +824,9 @@ In the secondary constructor (lines 92-103), keep `TwoAxisPolicy()` and add the 
     )
 ```
 
-Immediately after the secondary constructor, add the mutable policy holder:
+- [ ] **Step 3: Add the effective-settings flow (AFTER the `settings` StateFlow)**
 
-```kotlin
-    // Rebuilt whenever the effective priority settings change (see the collector below), so band
-    // changes take effect without an app restart. Starts from the injected policy.
-    private var twoAxisPolicy: TwoAxisPolicy = initialPolicy
-```
-
-- [ ] **Step 3: Add the effective-settings flow and the policy rebuild**
-
-Find the `settings` StateFlow (declared around line 159-166). Immediately after it, add:
+Find the `settings` StateFlow (declared around line 159-166). Immediately after it (so `settings` is initialized before this references it), add:
 
 ```kotlin
     /** The priority-timing settings the active board uses (global or its per-database override). */
@@ -727,33 +834,29 @@ Find the `settings` StateFlow (declared around line 159-166). Immediately after 
         combine(settings, prioritySettingsStore.observe()) { s, g ->
             if (s == null) g else resolvePrioritySettings(g, s)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PrioritySettings.DEFAULT)
-
-    init {
-        viewModelScope.launch {
-            effectivePrioritySettings.collect { twoAxisPolicy = TwoAxisPolicy(it.dateBandConfig()) }
-        }
-    }
 ```
 
-(`combine`, `stateIn`, `SharingStarted`, `launch`, `StateFlow` are already imported in this file.)
+(`combine`, `stateIn`, `SharingStarted`, `StateFlow` are already imported in this file. No `init` block or mutable policy is added.)
 
 - [ ] **Step 4: Verify compile**
 
 Run: `./gradlew :app:compileDebugKotlin`
-Expected: BUILD SUCCESSFUL. (`twoAxisPolicy` remains referenced at the existing evaluate call sites; only its declaration moved from a `val` param to a `var`.)
+Expected: BUILD SUCCESSFUL.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add app/src/main/java/com/ironclinicgym/sift/ui/board/BoardViewModel.kt
-git commit -m "feat(app): rebuild TwoAxisPolicy from effective PrioritySettings; expose flow (T-008)"
+git commit -m "feat(app): expose effective PrioritySettings flow on BoardViewModel (T-008)"
 ```
 
 ---
 
 ### Task 7: AddTaskSheetV2 uses effective config (app, T-008 + T-009)
 
-**Goal:** The add-task sheet resolves the date-picker priority preview and the quick-date chips from the effective `PrioritySettings` instead of hardcoded defaults.
+**Goal:** The add-task sheet resolves the priority a dated task is assigned (its placement) and the quick-date chip times from the effective `PrioritySettings` instead of hardcoded defaults.
+
+**Scope note (verified):** `resolveBand` at line 194 lives in `resolvedPriority()`, which is a local function inside the `AddTaskSheetV2` composable body (not a separate state holder), so a `val prioritySettings` collected in that body IS in scope there and in the quick-date chip handlers. `resolvedPriority()` runs at submit, so this drives where the dated task LANDS. There is no separate live date-picker preview to change here; if an in-picker preview is later added it should reuse the same effective config.
 
 **Files:**
 - Modify: `app/src/main/java/com/ironclinicgym/sift/ui/board/AddTaskSheetV2.kt` (collect the flow near line 167; band preview line 194; quick-date chips lines 587/593/599)
@@ -781,7 +884,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
     val prioritySettings by viewModel.effectivePrioritySettings.collectAsStateWithLifecycle()
 ```
 
-- [ ] **Step 2: Use the config in the band preview (line 194)**
+- [ ] **Step 2: Use the config for date-based placement (line 194)**
 
 Replace:
 
@@ -1013,28 +1116,62 @@ git commit -m "feat(app): Priority timing settings section with scope toggle (T-
 **Goal:** A blocked toggle in the task detail drawer that calls the existing `toggleBlocked`, with optimistic in-place state.
 
 **Files:**
+- Modify: `app/src/main/java/com/ironclinicgym/sift/ui/board/BoardViewModel.kt` (add idempotent `setBlocked`)
 - Modify: `app/src/main/java/com/ironclinicgym/sift/ui/board/TaskDetailSheet.kt` (signature ~line 59; secondary-action area ~line 272)
 - Modify: `app/src/main/java/com/ironclinicgym/sift/ui/board/BoardScreen.kt` (call site line 255-279)
 - Modify: `app/src/main/java/com/ironclinicgym/sift/ui/board/FocusedBucketScreen.kt` (call site line 241-265)
 
 **Acceptance Criteria:**
-- [ ] `TaskDetailSheet` takes `onToggleBlocked: () -> Unit`; both call sites pass `{ viewModel.toggleBlocked(item.task.pageId) }`.
-- [ ] A blocked control appears in the secondary actions, labelled "Mark blocked" when not blocked and "Blocked" when blocked, toggling an optimistic local state on tap.
+- [ ] `BoardViewModel.setBlocked(pageId, blocked)` persists the DESIRED value idempotently (not derived from a possibly stale projection).
+- [ ] `upsertLocalField` is serialized behind `localStateMutex` so concurrent/ rapid local-state writes to a page never overwrite one another; for the blocked field, the last tap wins.
+- [ ] `TaskDetailSheet` takes `onSetBlocked: (Boolean) -> Unit`; both call sites pass `{ blocked -> viewModel.setBlocked(item.task.pageId, blocked) }`.
+- [ ] A blocked control in the secondary actions is labelled "Mark blocked" / "Blocked" and drives a `remember`-backed optimistic local state; the FINAL persisted value matches the last tap.
 - [ ] Uses an existing subsetted glyph (`event_busy`); no new codepoint added.
 
 **Verify:** `./gradlew :app:assembleDebug` -> BUILD SUCCESSFUL. [ui-auto] where instrumentation exists; [manual] on device.
 
 **Steps:**
 
-- [ ] **Step 1: Add the parameter**
+- [ ] **Step 1: Add idempotent `setBlocked` and serialize local-state writes in `BoardViewModel`**
+
+In `BoardViewModel.kt`, next to the existing `toggleBlocked` (line 932), add:
+
+```kotlin
+    /** Idempotent: persist the desired blocked value (safe under rapid taps). */
+    fun setBlocked(pageId: String, blocked: Boolean) {
+        viewModelScope.launch {
+            upsertLocalField(pageId) { it.copy(isBlocked = blocked) }
+        }
+    }
+```
+
+Then serialize `upsertLocalField` so rapid same-field taps (and concurrent pin / protected / brain-dump / blocked writes to the same page) apply in order and never clobber one another. Add a mutex field and wrap the existing body (line ~945):
+
+```kotlin
+    // Orders every TaskLocalState read-modify-upsert so concurrent flag writes to the same page
+    // never overwrite one another; for a given field, the last intent wins.
+    private val localStateMutex = Mutex()
+
+    private suspend fun upsertLocalField(pageId: String, transform: (TaskLocalState) -> TaskLocalState) {
+        localStateMutex.withLock {
+            val mappingId = repository.mappingSet.value.active?.id ?: return
+            val current = localStateStore.get(pageId) ?: TaskLocalState(pageId = pageId, mappingId = mappingId)
+            localStateStore.upsert(transform(current).copy(lastModifiedAt = System.currentTimeMillis()))
+        }
+    }
+```
+
+Add imports if missing: `import kotlinx.coroutines.sync.Mutex` and `import kotlinx.coroutines.sync.withLock`. (The `return` inside the inline `withLock` is a non-local return from `upsertLocalField`; the lock is released either way. `toggleBlocked` can stay for other callers; the UI uses `setBlocked`.)
+
+- [ ] **Step 2: Add the parameter**
 
 In `TaskDetailSheet.kt`, add to the parameter list (after `onChangePriority: (PriorityView) -> Unit,` line ~57):
 
 ```kotlin
-    onToggleBlocked: () -> Unit,
+    onSetBlocked: (Boolean) -> Unit,
 ```
 
-- [ ] **Step 2: Add optimistic local state**
+- [ ] **Step 3: Add optimistic local state**
 
 After `var localPinLevel by remember(item.task.pageId) { mutableIntStateOf(item.task.pinLevel) }` (line 86) add:
 
@@ -1042,7 +1179,7 @@ After `var localPinLevel by remember(item.task.pageId) { mutableIntStateOf(item.
     var localBlocked by remember(item.task.pageId) { mutableStateOf(item.task.isBlocked) }
 ```
 
-- [ ] **Step 3: Add the blocked control to the secondary row**
+- [ ] **Step 4: Add the blocked control to the secondary row**
 
 In the "Edit + Remove secondary row" (lines 266-272), add a third button after Remove so the row reads:
 
@@ -1056,36 +1193,36 @@ In the "Edit + Remove secondary row" (lines 266-272), add a third button after R
                 SecondaryActionButton(
                     "event_busy",
                     if (localBlocked) "Blocked" else "Mark blocked",
-                    { localBlocked = !localBlocked; onToggleBlocked() },
+                    { val next = !localBlocked; localBlocked = next; onSetBlocked(next) },
                     Modifier.weight(1f),
                 )
             }
 ```
 
-- [ ] **Step 4: Wire the two call sites**
+- [ ] **Step 5: Wire the two call sites**
 
 In `BoardScreen.kt`, in the `TaskDetailSheet(...)` call, after `onChangePriority = { ... },` (line 276) add:
 
 ```kotlin
-            onToggleBlocked = { viewModel.toggleBlocked(item.task.pageId) },
+            onSetBlocked = { blocked -> viewModel.setBlocked(item.task.pageId, blocked) },
 ```
 
 In `FocusedBucketScreen.kt`, in its `TaskDetailSheet(...)` call, after `onChangePriority = { ... },` (line 262) add:
 
 ```kotlin
-                onToggleBlocked = { viewModel.toggleBlocked(item.task.pageId) },
+                onSetBlocked = { blocked -> viewModel.setBlocked(item.task.pageId, blocked) },
 ```
 
-- [ ] **Step 5: Verify build**
+- [ ] **Step 6: Verify build**
 
 Run: `./gradlew :app:assembleDebug`
 Expected: BUILD SUCCESSFUL.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add app/src/main/java/com/ironclinicgym/sift/ui/board/TaskDetailSheet.kt app/src/main/java/com/ironclinicgym/sift/ui/board/BoardScreen.kt app/src/main/java/com/ironclinicgym/sift/ui/board/FocusedBucketScreen.kt
-git commit -m "feat(app): blocked toggle in task detail sheet (T-006)"
+git add app/src/main/java/com/ironclinicgym/sift/ui/board/BoardViewModel.kt app/src/main/java/com/ironclinicgym/sift/ui/board/TaskDetailSheet.kt app/src/main/java/com/ironclinicgym/sift/ui/board/BoardScreen.kt app/src/main/java/com/ironclinicgym/sift/ui/board/FocusedBucketScreen.kt
+git commit -m "feat(app): idempotent setBlocked + blocked toggle in task detail sheet (T-006)"
 ```
 
 ---
@@ -1160,13 +1297,14 @@ git commit -m "feat(app): BLOCKED tag on board task rows (T-006)"
 
 **USER-ORDERED GATE — NON-SKIPPABLE.** This task was requested by the user in the current conversation. It MUST NOT be closed by walking around it, by declaring it "verified inline", or by substituting a cheaper check. Close only after every item in `acceptanceCriteria` has been re-validated independently, with output captured.
 
-**Goal:** Assemble the consolidated on-device UAT round 3 script for BJ and run every Claude-owned test with captured pass/fail counts, so Phase 3.5 can be signed off.
+**Goal:** Assemble the consolidated on-device UAT round 3 script for BJ and run every Claude-owned test with captured pass/fail counts, so Phase 3.5 can be signed off. The script also flags the two known Phase 3.5 spec gaps found during review (ISS-001 self-managing ladder, ISS-002 in-picker band preview) for explicit device verification, so the sign-off is honest rather than silently over-claiming.
 
 **Files:**
 - Create: `docs/PHASE_3_5_UAT_round3.md`
 
 **Acceptance Criteria:**
 - [ ] `docs/PHASE_3_5_UAT_round3.md` covers the full Phase 3.5 surface: spec section 16 acceptance criteria, section 19 device checklist, the Round-1 tagged [manual] items, and the three new features (blocked flag, configurable date bands, configurable quick-date defaults incl. the global/per-database scope toggle).
+- [ ] The script has an explicit "known failing spec criteria" section that lists ISS-001 (self-managing dated ladder / auto-climb) and ISS-002 (in-picker priority preview) with issue links, and states that full Phase 3.5 sign-off is blocked until both are closed.
 - [ ] The script is organized by area with checkboxes and marks each item [logic] / [ui-auto] / [manual].
 - [ ] `./gradlew :core:test` passes; capture the summary line.
 - [ ] `./gradlew :app:testDebugUnitTest` passes (includes `BoardIconsFontTest`); capture the summary line.
@@ -1191,10 +1329,11 @@ Assemble the script with these sections (each item a `- [ ]` checkbox, tagged):
 2. **Drag / redirect** (spec 16): dated redirect prompt; undated free drag.
 3. **Pinning + Protected + safety catch + Signal Inflation** (spec 16 + round-1 B-items).
 4. **Blocked flag (NEW, T-006):** toggle in task detail marks blocked; BLOCKED tag shows on the board row; blocked does not carry to a recurring task's next occurrence.
-5. **Date bands (NEW, T-008):** Settings > Priority timing > "Soon/Later up to N days" changes where a dated task lands and the date-picker preview; global vs per-database scope toggle behaves (edit under global applies everywhere; flip to per-database and confirm this database diverges while others stay put).
+5. **Date bands (NEW, T-008):** after changing Settings > Priority timing > "Soon/Later up to N days", a NEWLY added dated task lands in the band dictated by the new boundaries (existing dated tasks are not re-placed; that is pre-existing ladder behavior, see Notes). Global vs per-database scope toggle behaves: an edit under "Use across all databases" applies everywhere; flip it off and confirm this database diverges while others stay put.
 6. **Quick-date defaults (NEW, T-009):** Tomorrow/Next week/Next month land at the configured local times; changing "First day of week" changes the Next-week target day; "Later today" still +4h.
-7. **Round-1 [manual] regressions:** status bar text in light mode, bottom tabs above nav bar, top notification bar auto-dismiss/swipe, tab icons distinct, Notion external-link icon.
-8. **Claude-owned test results:** paste the three captured summary lines from Step 1; state that sign-off is pending BJ's on-device pass.
+7. **Known failing spec criteria (documented, not device-tested as if passing):** the T-008 review confirmed by code inspection that two Phase 3.5 spec criteria are unimplemented, so list them here as KNOWN FAILING with issue links rather than pass/fail device steps: (a) a dated task's priority is self-managing / auto-climbs as its date nears (ISS-001); (b) the date picker shows a live priority-band preview during selection (ISS-002). **Full Phase 3.5 sign-off is BLOCKED until ISS-001 and ISS-002 are closed.** The device pass below covers only the surface that can actually pass.
+8. **Round-1 [manual] regressions:** status bar text in light mode, bottom tabs above nav bar, top notification bar auto-dismiss/swipe, tab icons distinct, Notion external-link icon.
+9. **Claude-owned test results:** paste the three captured summary lines from Step 1; state that sign-off is pending BJ's on-device pass, and list any ISS-001 / ISS-002 findings surfaced above.
 
 - [ ] **Step 3: Commit**
 
@@ -1214,5 +1353,9 @@ Report the captured test summaries and tell BJ the on-device UAT script is ready
 - **T-007** (self-quieting Added-to-priority chip) is the fourth Phase 3.5 gap ticket, deliberately not in this batch.
 - **"Later today" offset** stays hardcoded at +4h (not in the Round-2 settings list).
 - **Board swipe for blocked** is backlog (both swipe directions are committed to complete/snooze).
-- **Live re-placement of already-created dated tasks when bands change** is not in scope: bands apply at date-assignment time via `resolveBand`, matching current behavior.
+- **Scope of T-008 wiring (verified during review).** `resolveBand` is called in exactly one app location, `AddTaskSheetV2.resolvedPriority` (task creation), and `TwoAxisPolicy.evaluateDateChange` (the only `DateBandConfig` consumer) has no call site anywhere today. So feeding the configured bands into task creation is the complete surface for making the bands "used." The following are deliberately NOT in scope, being pre-existing product gaps rather than T-008 wiring, and are tracked as filed issues:
+  - **ISS-001** (high): dated priorities are not self-managing across all date paths (no re-derivation on snooze/brain-dump/remove-date, no day-rollover or boundary-change reprojection, `BoardProjection` groups by stored priority).
+  - **ISS-002** (medium): the date picker lacks the live priority-band preview during selection.
+  - **ISS-003** (low): `TaskLocalState` flag writes (pin/protected/brain-dump/blocked) can drop concurrent field updates. T-006 makes `setBlocked` idempotent for the value-inversion sub-case; the broader per-page serialization is tracked here.
+  - Codex flagged these as reasons a blanket sign-off would over-claim; they are addressed by filing the issues AND making Task 11's UAT verify ISS-001/ISS-002 on device, without expanding the three scoped gap tickets.
 - **New Material Symbols glyph** avoided on purpose (subset font, no in-repo regen tooling). A dedicated "block"/"front_hand" glyph can replace `event_busy` and the text tag later, once a subset regen is run.

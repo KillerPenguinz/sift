@@ -1,0 +1,21 @@
+{
+  "components": [
+    "app/ui/board/AddTaskSheetV2"
+  ],
+  "createdBy": "codex-review (via Claude)",
+  "dedupeKey": "phase35-review-2026-07-27:date-picker-band-preview",
+  "discoveredDate": "2026-07-28",
+  "id": "ISS-002",
+  "impact": "Phase 3.5 spec section 4 and Round-1 doc B4.4 require the date picker to show which priority band the selected date falls into WHILE the user is selecting (before confirming), to build trust. Verified during T-008 review: resolveBand/previewLabel are not called from any date-picker composable in AddTaskSheetV2; the only resolveBand call is in resolvedPriority (submit). The post-selection helper text \"Sift handles the priority. Adjust anytime.\" is intentional, but the in-picker live preview appears unimplemented. Fix: derive a preview band from the tentatively selected date and the effective PrioritySettings, render the mapped priority display name inside the picker, and reuse the same resolver at submission. Out of scope for T-008 (which wires the configured bands into placement); tracked here so Phase 3.5 sign-off can verify or defer it.",
+  "location": [],
+  "phase": "p35",
+  "relatedTickets": [
+    "T-008",
+    "T-005"
+  ],
+  "resolution": null,
+  "resolvedDate": null,
+  "severity": "medium",
+  "status": "open",
+  "title": "Date picker lacks the live priority-band preview during selection"
+}

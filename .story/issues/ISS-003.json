@@ -1,0 +1,21 @@
+{
+  "components": [
+    "app/ui/board/BoardViewModel",
+    "app/data/local/TaskLocalStateRoom"
+  ],
+  "createdBy": "codex-review (via Claude)",
+  "dedupeKey": "phase35-review-2026-07-27:tasklocalstate-concurrent-writes",
+  "discoveredDate": "2026-07-28",
+  "id": "ISS-003",
+  "impact": "BoardViewModel local-flag mutations (toggleProtected, pinTask, setBrainDump, and the new setBlocked) all use upsertLocalField: a read (localStateStore.get) then a full-row upsert, fire-and-forget in separate coroutines. Concurrent writes to different fields of the same page (e.g. pin then block in quick succession) can read the same TaskLocalState snapshot and overwrite each other's fields; rapid same-field writes can also complete out of order. Pre-existing pattern, not introduced by T-006 (T-006 makes setBlocked idempotent for the value-inversion sub-case). Fix: serialize all TaskLocalState mutations per page id (a per-page Mutex/actor) or use atomic per-column DAO updates, and optionally surface write failure so optimistic UI can revert. Tracked separately from the T-006 UI work.",
+  "location": [],
+  "phase": "p35",
+  "relatedTickets": [
+    "T-006"
+  ],
+  "resolution": null,
+  "resolvedDate": null,
+  "severity": "low",
+  "status": "open",
+  "title": "TaskLocalState flag writes can drop concurrent field updates"
+}
