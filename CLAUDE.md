@@ -9,6 +9,32 @@ Phases 0 (theming), 1 (onboarding + mapping), 2 (read grid), 3 (plain write laye
 Phase 3.5 (Two Axis Model) IMPLEMENTED, currently in UAT and bug-fix iterations.
 Phase 4 and beyond: not started. See "What NOT to build."
 
+The live roadmap, backlog, open issues, and per-session handovers live in **storybloq** (`.story/` at the repo root). This file holds the standing constraints; storybloq holds the current work. Load it at the start of every session (see "Ways of working").
+
+## Ways of working (required, every session, every agent)
+
+This project is built with a fixed process so the work is the same no matter who does it (a human, Claude, or Codex) or when. Two systems are mandatory on every session: **storybloq** (what to work on, and what was decided) and the **superpowers** process discipline (how to think, build, and verify). Both govern architectural and product design decisions, not just coding tasks.
+
+**Start of every session.** Load the tracker before anything else: `/story` in Claude Code, `$story` in Codex, or `storybloq status` then `storybloq recap` then `storybloq handover latest` via the CLI. The `.story/` directory at the repo root is the single source of truth for current state, the roadmap, open tickets and issues, and prior handovers. Work from a ticket; if the work is not tracked yet, create the ticket first.
+
+**Every architectural or product decision follows this loop. Do not skip steps.**
+
+1. **Brainstorm first.** Before adding or changing any feature, component, or behavior, use the superpowers brainstorming skill (Claude Code: the `brainstorming` skill) to explore intent and options before writing code. Agents without the skill follow the same discipline: clarify the problem and weigh options before implementing.
+2. **Record the decision in two places.** Write it as a storybloq note or ticket (in-repo, travels with the code) and mirror it to the Notion decision log (Notion stays authoritative; see "Decision log"). A decision that lives only in a chat transcript does not exist.
+3. **Plan before building.** Use the superpowers writing-plans and executing-plans skills to turn the decision into bite-sized tasks, wired as storybloq tickets with dependencies.
+4. **Build test first.** Follow the superpowers test-driven-development skill: write the [logic] tests before the implementation (see "Testing convention"). Set the ticket to `inprogress` when you start.
+5. **Debug systematically.** When something breaks, use the superpowers systematic-debugging skill instead of guessing. Log anything out of scope as a storybloq issue rather than fixing it inline.
+6. **Verify before claiming done.** Use the superpowers verification-before-completion skill: run the tests and build and confirm the output before saying anything is complete. Mark the ticket `complete` in the same commit as the code.
+7. **Review significant changes.** Use the superpowers requesting-code-review skill (or `/story review T-XXX`) before merging.
+
+**End of every session.** Write a handover (`storybloq handover create` or `/story handover`) capturing what changed and why, run `storybloq snapshot`, and capture non-obvious learnings as storybloq lessons.
+
+**Tooling notes.**
+
+- Storybloq works for every agent: `/story` (Claude Code), `$story` (Codex), or the `storybloq` CLI. If the MCP tools or hooks are missing, run `storybloq setup --client all` and restart the client.
+- The superpowers skills ship in Claude Code and are invoked with the Skill tool. Agents without the plugin must still follow the same discipline above: brainstorm, plan, test first, verify, review.
+- Governance is agent-neutral. `CLAUDE.md` is the canonical instruction file; `AGENTS.md` points here so Codex and other agents load the same rules.
+
 ## Stack
 
 - **Language:** Kotlin
@@ -69,6 +95,9 @@ docs/
   PHASE_1_SPEC.md, Phase_3_Spec.md, PHASE_3_5_SPEC.md
   SIFT_DESIGN_DIRECTION.md, sift-tokens.js
   Various UAT/fix docs
+
+.story/           Storybloq tracker: roadmap, tickets, issues, notes, handovers.
+                  Source of truth for current work. Load with /story or $story.
 ```
 
 ## Terminology (LOCKED, System A)
@@ -119,9 +148,9 @@ These are the current design decisions governing how the app works. Read the ful
 
 ## What NOT to build
 
-These are out of scope. Claude Code must not implement any of these unprompted, even if they appear to be gaps in the codebase. Each has its own phase, spec, or deliberate deferral reason.
+These are out of scope. The coding agent (Claude or Codex) must not implement any of these unprompted, even if they appear to be gaps in the codebase. Each has its own phase, spec, or deliberate deferral reason, and each has a storybloq ticket. Pick one up only when its ticket is explicitly selected for work.
 
-- AI capture / natural language parsing (Phase 4, unspec'd)
+- AI capture / natural language parsing, plus a Pebble Watch 2 companion that routes on-watch actions to Notion (Phase 4; see storybloq Phase 4 and note N-002)
 - Home screen widget (Phase 5, unspec'd)
 - Pricing / IAP / Supporter tier (Phase 6, unspec'd)
 - AI coach (Phase 7, unspec'd)
@@ -135,13 +164,13 @@ These are out of scope. Claude Code must not implement any of these unprompted, 
 
 ## Testing convention
 
-Every acceptance criterion is tagged by testing tier. Claude Code owns [logic] and [ui-auto]; the maintainer owns [manual].
+Every acceptance criterion is tagged by testing tier. The coding agent (Claude or Codex) owns [logic] and [ui-auto]; the maintainer owns [manual].
 
 - **[logic]** Fully autonomous. Write and run unit/integration tests. Pass/fail is unambiguous. Includes: domain functions, ViewModel state transitions, Notion write-layer payloads, mapping validation, string scanning, RRULE generation, date-to-priority bands.
 - **[ui-auto]** Partially autonomous. Compose UI tests asserting element presence/absence/tap response. Cannot judge visual appearance. Catches "element is missing" but not "element looks wrong."
 - **[manual]** Human only. Visual correctness, animation feel, real-device behavior, color/spacing judgment.
 
-**Standing instruction:** For every item implemented, write the [logic] tests as you build. Mark an item done only when its logic tests pass. At the end of a session, produce a Build Report with: what was implemented, test results (X of Y pass), every [manual] item listed separately for the maintainer's review, anything that could not be verified and why, and any assumptions made (flag, never decide silently).
+**Standing instruction:** For every item implemented, write the [logic] tests as you build. Mark an item done only when its logic tests pass. At the end of a session, produce a Build Report (recorded as the storybloq handover for the session) with: what was implemented, test results (X of Y pass), every [manual] item listed separately for the maintainer's review, anything that could not be verified and why, and any assumptions made (flag, never decide silently).
 
 ## Build commands
 
@@ -164,10 +193,10 @@ Dev token is seeded only in DEBUG builds when no stored OAuth token exists. OAut
 
 ## Decision log
 
-All design and architecture decisions must be recorded in the Sift Notion workspace. Notion is the single source of truth for decisions. The local `docs/` folder contains exported snapshots for Claude Code to reference during a build session, but Notion is authoritative.
+All design and architecture decisions must be recorded in two places: a storybloq note or ticket in `.story/` (in-repo, so it travels with the code and reaches every agent) and the Sift Notion workspace. Notion remains the single source of truth for the canonical decision record; storybloq is the working tracker. The local `docs/` folder contains exported snapshots for the coding agent to reference during a build session, but Notion is authoritative.
 
-- **Where decisions live:** The Phase Tracker row for the relevant phase, the Consolidated Open Questions page, or a dedicated feature concept page inside the relevant phase row.
-- **When to update:** After any decision is made during a session (via conversation, brainstorming, or mid-build clarification), update the relevant Notion page before the session ends. Do not let decisions live only in the conversation transcript.
+- **Where decisions live:** In storybloq, a note (for rationale and open questions) or a ticket (for committed work). In Notion, the Phase Tracker row for the relevant phase, the Consolidated Open Questions page, or a dedicated feature concept page inside the relevant phase row.
+- **When to update:** After any decision is made during a session (via conversation, brainstorming, or mid-build clarification), capture it in storybloq immediately and mirror it to the relevant Notion page before the session ends. Keep the two in sync. Do not let decisions live only in the conversation transcript.
 - **Backlog review:** When speccing or planning any new feature or phase, always check the Consolidated Open Questions page, the Future Ideas and Backlog page, and any relevant concept pages for items that may have been deferred there. Surface anything that belongs in scope before locking the spec.
 - **Notion workspace hub:** `https://app.notion.com/p/38ee3d39a44580038dc3ff7861777ff7`
 - **Phase Tracker:** `https://app.notion.com/p/f592c4d4278945c4b824d5325aaf8b2b`

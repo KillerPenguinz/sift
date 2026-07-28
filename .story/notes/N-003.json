@@ -1,0 +1,13 @@
+{
+  "content": "Governance decision (2026-07-28): storybloq and the superpowers process discipline are now mandatory for every session and every architectural/product decision, for any agent (Claude or Codex). CLAUDE.md gained a 'Ways of working' section codifying the loop: load the tracker first; brainstorm before designing; record decisions in storybloq AND the Notion decision log; plan; build test-first; debug systematically; verify before done; review; handover at session end. Role language made agent-neutral ('the coding agent'). AGENTS.md added at repo root pointing to CLAUDE.md so Codex loads the same rules.",
+  "createdDate": "2026-07-28",
+  "id": "N-003",
+  "status": "active",
+  "tags": [
+    "governance",
+    "process",
+    "decision"
+  ],
+  "title": null,
+  "updatedDate": "2026-07-28"
+}
