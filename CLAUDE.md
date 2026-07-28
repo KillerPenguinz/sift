@@ -11,29 +11,43 @@ Phase 4 and beyond: not started. See "What NOT to build."
 
 The live roadmap, backlog, open issues, and per-session handovers live in **storybloq** (`.story/` at the repo root). This file holds the standing constraints; storybloq holds the current work. Load it at the start of every session (see "Ways of working").
 
-## Ways of working (required, every session, every agent)
+## Ways of working (required, every session)
 
-This project is built with a fixed process so the work is the same no matter who does it (a human, Claude, or Codex) or when. Two systems are mandatory on every session: **storybloq** (what to work on, and what was decided) and the **superpowers** process discipline (how to think, build, and verify). Both govern architectural and product design decisions, not just coding tasks.
+This project is built with a fixed process so the work is the same no matter who does it or when. There are two roles, and they are not symmetric:
 
-**Start of every session.** Load the tracker before anything else: `/story` in Claude Code, `$story` in Codex, or `storybloq status` then `storybloq recap` then `storybloq handover latest` via the CLI. The `.story/` directory at the repo root is the single source of truth for current state, the roadmap, open tickets and issues, and prior handovers. Work from a ticket; if the work is not tracked yet, create the ticket first.
+- **Claude Code is where planning and implementation happen.** It runs the full **superpowers** workflow and owns every architectural and product decision: brainstorming, specs, plans, tasks, implementation, and review. This is the default place all real work is done.
+- **Codex is an occasional coding executor only.** It writes code for specific tickets that Claude Code has already brainstormed, specced, and planned. It does not brainstorm, spec, plan, or make design or product decisions. If a task is ambiguous or needs a decision, it stops and hands back to Claude Code or the maintainer.
 
-**Every architectural or product decision follows this loop. Do not skip steps.**
+**Storybloq is the shared tracker for both roles.** It carries the roadmap, the tickets, the plans and specs attached to them, and status. Load it at the start of every session: `/story` in Claude Code, `$story` in Codex, or `storybloq status` then `storybloq recap` then `storybloq handover latest` via the CLI. Work from a ticket; if the work is not tracked yet, create the ticket first.
 
-1. **Brainstorm first.** Before adding or changing any feature, component, or behavior, use the superpowers brainstorming skill (Claude Code: the `brainstorming` skill) to explore intent and options before writing code. Agents without the skill follow the same discipline: clarify the problem and weigh options before implementing.
-2. **Record the decision in two places.** Write it as a storybloq note or ticket (in-repo, travels with the code) and mirror it to the Notion decision log (Notion stays authoritative; see "Decision log"). A decision that lives only in a chat transcript does not exist.
-3. **Plan before building.** Use the superpowers writing-plans and executing-plans skills to turn the decision into bite-sized tasks, wired as storybloq tickets with dependencies.
-4. **Build test first.** Follow the superpowers test-driven-development skill: write the [logic] tests before the implementation (see "Testing convention"). Set the ticket to `inprogress` when you start.
-5. **Debug systematically.** When something breaks, use the superpowers systematic-debugging skill instead of guessing. Log anything out of scope as a storybloq issue rather than fixing it inline.
-6. **Verify before claiming done.** Use the superpowers verification-before-completion skill: run the tests and build and confirm the output before saying anything is complete. Mark the ticket `complete` in the same commit as the code.
-7. **Review significant changes.** Use the superpowers requesting-code-review skill (or `/story review T-XXX`) before merging.
+### Claude Code workflow (planning and implementation)
 
-**End of every session.** Write a handover (`storybloq handover create` or `/story handover`) capturing what changed and why, run `storybloq snapshot`, and capture non-obvious learnings as storybloq lessons.
+This is the primary workflow: all design, planning, spec and task creation, and implementation happen here. Every architectural or product decision follows this loop. Do not skip steps. Each step uses a **superpowers** skill, invoked with the Skill tool.
 
-**Tooling notes.**
+1. **Brainstorm first** (`brainstorming` skill). Before adding or changing any feature, component, or behavior, explore intent and options before writing code.
+2. **Record the decision in two places.** A storybloq note or ticket (in-repo, travels with the code) and the Notion decision log (Notion stays authoritative; see "Decision log"). A decision that lives only in a chat transcript does not exist.
+3. **Write the plan and spec** (`writing-plans`, then `executing-plans`). Turn the decision into bite-sized tasks, wired as storybloq tickets with dependencies. The plan must be self-contained, because it is what Codex later executes.
+4. **Build test first** (`test-driven-development` skill). Write the [logic] tests before the implementation (see "Testing convention"). Set the ticket to `inprogress` when work starts.
+5. **Debug systematically** (`systematic-debugging` skill) instead of guessing. Log anything out of scope as a storybloq issue rather than fixing it inline.
+6. **Verify before claiming done** (`verification-before-completion` skill). Run the tests and build and confirm the output before saying anything is complete. Mark the ticket `complete` in the same commit as the code.
+7. **Review significant changes** (`requesting-code-review` skill, or `/story review T-XXX`) before merging.
 
-- Storybloq works for every agent: `/story` (Claude Code), `$story` (Codex), or the `storybloq` CLI. If the MCP tools or hooks are missing, run `storybloq setup --client all` and restart the client.
-- The superpowers skills ship in Claude Code and are invoked with the Skill tool. Agents without the plugin must still follow the same discipline above: brainstorm, plan, test first, verify, review.
-- Governance is agent-neutral. `CLAUDE.md` is the canonical instruction file; `AGENTS.md` points here so Codex and other agents load the same rules.
+At the end of a session, write a handover (`/story handover` or `storybloq handover create`), run `storybloq snapshot`, and capture non-obvious learnings as storybloq lessons.
+
+### Codex workflow (executing a coding task only)
+
+Codex is brought in occasionally, and only to write code for a task Claude Code has already planned. When acting as Codex:
+
+1. Load the tracker (`$story`, or `storybloq ticket get <id>`) and open the assigned ticket. Read its linked plan or spec and the hard constraints in this file.
+2. Implement exactly that ticket, test first, honoring every hard constraint. Do not expand scope, redesign, or make product decisions.
+3. If anything is ambiguous, missing, or would require a design choice, stop, file a storybloq issue or blocker, and hand back to Claude Code or the maintainer. Do not guess.
+4. Update the ticket status and keep the automated tests green. Brainstorming, planning, and spec changes belong to Claude Code, not Codex.
+
+### Tooling notes
+
+- **Superpowers is a Claude Code plugin and is used only in Claude Code.** It is the engine for all brainstorming, planning, spec and task creation, TDD, and review. Codex does not run it.
+- **Storybloq works in both clients** (`/story`, `$story`, or the `storybloq` CLI). If its MCP tools or hooks are missing, run `storybloq setup --client all` and restart the client.
+- `CLAUDE.md` is the canonical instruction file; `AGENTS.md` points here so Codex loads the same constraints and the executor rules above.
 
 ## Stack
 
@@ -164,7 +178,7 @@ These are out of scope. The coding agent (Claude or Codex) must not implement an
 
 ## Testing convention
 
-Every acceptance criterion is tagged by testing tier. The coding agent (Claude or Codex) owns [logic] and [ui-auto]; the maintainer owns [manual].
+Every acceptance criterion is tagged by testing tier. Claude Code (or Codex when it is assigned a coding task) owns [logic] and [ui-auto]; the maintainer owns [manual].
 
 - **[logic]** Fully autonomous. Write and run unit/integration tests. Pass/fail is unambiguous. Includes: domain functions, ViewModel state transitions, Notion write-layer payloads, mapping validation, string scanning, RRULE generation, date-to-priority bands.
 - **[ui-auto]** Partially autonomous. Compose UI tests asserting element presence/absence/tap response. Cannot judge visual appearance. Catches "element is missing" but not "element looks wrong."
