@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.ironclinicgym.sift.core.board.BoardProjection
 import com.ironclinicgym.sift.core.board.BoardSettings
 import com.ironclinicgym.sift.core.board.ClockSnapshot
+import com.ironclinicgym.sift.core.board.PrioritySettings
 import com.ironclinicgym.sift.core.board.ProjectedItem
 import com.ironclinicgym.sift.core.board.ProjectedPriority
 import com.ironclinicgym.sift.core.board.SafetyCatchEvaluation
@@ -16,6 +17,7 @@ import com.ironclinicgym.sift.core.board.evaluateSafetyCatch
 import com.ironclinicgym.sift.core.board.formatHourMinute
 import com.ironclinicgym.sift.core.board.projectBoard
 import com.ironclinicgym.sift.core.board.projectBrainDump
+import com.ironclinicgym.sift.core.board.resolvePrioritySettings
 import com.ironclinicgym.sift.core.domain.ActionHistoryEntry
 import com.ironclinicgym.sift.core.domain.NotificationTier
 import com.ironclinicgym.sift.core.domain.PolicyDecision
@@ -35,6 +37,7 @@ import com.ironclinicgym.sift.core.domain.ports.ActionHistoryStore
 import com.ironclinicgym.sift.core.domain.ports.BoardSettingsStore
 import com.ironclinicgym.sift.core.domain.ports.LabelStore
 import com.ironclinicgym.sift.core.domain.ports.NotificationStore
+import com.ironclinicgym.sift.core.domain.ports.PrioritySettingsStore
 import com.ironclinicgym.sift.core.domain.ports.TaskLocalState
 import com.ironclinicgym.sift.core.domain.ports.TaskLocalStateStore
 import com.ironclinicgym.sift.core.mapping.DatabaseMapping
@@ -87,6 +90,7 @@ class BoardViewModel(
     private val notificationStore: NotificationStore,
     private val actionHistoryStore: ActionHistoryStore,
     private val labelStore: LabelStore,
+    private val prioritySettingsStore: PrioritySettingsStore,
 ) : ViewModel() {
 
     constructor(container: AppContainer) : this(
@@ -100,6 +104,7 @@ class BoardViewModel(
         container.notificationStore,
         container.actionHistoryStore,
         container.labelStore,
+        container.prioritySettingsStore,
     )
 
     private val writeService get() = repository.writeService
@@ -164,6 +169,12 @@ class BoardViewModel(
             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** The priority-timing settings the active board uses (global or its per-database override). */
+    val effectivePrioritySettings: StateFlow<PrioritySettings> =
+        combine(settings, prioritySettingsStore.observe()) { s, g ->
+            if (s == null) g else resolvePrioritySettings(g, s)
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PrioritySettings.DEFAULT)
 
     val availableLabels: StateFlow<List<String>> =
         repository.activeTasks.map { tasks ->
