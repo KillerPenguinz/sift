@@ -20,6 +20,15 @@
     "codexReviewBackends": [
       "lenses"
     ],
-    "handoverInterval": 3
+    "handoverInterval": 3,
+    "stages": {
+      "TEST": {
+        "enabled": true
+      },
+      "WRITE_TESTS": {
+        "enabled": true,
+        "onExhaustion": "plan"
+      }
+    }
   }
 }

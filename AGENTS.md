@@ -28,5 +28,10 @@ doing anything.
    Do not guess.
 5. Update the ticket status and keep the automated tests green.
 
+If you need docs for a library, framework, SDK, API, or CLI and the Context7 MCP
+is available, use it (`resolve-library-id` then `query-docs`) instead of relying
+on training data. See the Context7 section in CLAUDE.md for the project's seed
+library ids.
+
 Superpowers is a Claude Code plugin and is not available or used here. If
 storybloq's tools are missing, run `storybloq setup --client all` and restart.

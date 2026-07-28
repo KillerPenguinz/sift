@@ -49,6 +49,23 @@ Codex is brought in occasionally, and only to write code for a task Claude Code 
 - **Storybloq works in both clients** (`/story`, `$story`, or the `storybloq` CLI). If its MCP tools or hooks are missing, run `storybloq setup --client all` and restart the client.
 - `CLAUDE.md` is the canonical instruction file; `AGENTS.md` points here so Codex loads the same constraints and the executor rules above.
 
+## Context7 (current library documentation, required)
+
+Before writing or changing any code that touches a library, framework, SDK, API, CLI, or cloud service, fetch its current documentation with the **Context7 MCP** instead of relying on training data. This is required for setup and configuration, API syntax, version migrations, CLI usage, and library-specific debugging. Training data lags real releases, and this project runs bleeding-edge versions (Kotlin 2.2, AGP 9, Compose BOM 2026.x), so stale assumptions are a real source of bugs.
+
+Flow: call `resolve-library-id` (the library name plus what you want to look up), pick the best match, then `query-docs` with that id, one concept per query. In Claude Code the `context7-mcp` skill wraps this. Do not use Context7 for business logic, refactoring, code review, or general programming concepts.
+
+Seed library ids for this project's stack (resolve fresh if a query returns nothing, since ids can change):
+
+| Area | Context7 id |
+| --- | --- |
+| AndroidX Jetpack (Room, WorkManager, Glance, Lifecycle) | `/androidx/androidx` |
+| Jetpack Compose (UI, Material 3) | `/websites/developer_android_develop_ui_compose` |
+| kotlinx.serialization | `/kotlin/kotlinx.serialization` |
+| kotlinx.coroutines and Flow | `/kotlin/kotlinx.coroutines` |
+
+Resolve on first use (not yet pinned): Kotlin language, OkHttp, the Notion API (version 2025-09-03), Cloudflare Workers (the proxy), Gradle and AGP, and, for Phase 4, the Pebble SDK.
+
 ## Stack
 
 - **Language:** Kotlin

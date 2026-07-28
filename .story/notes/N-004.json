@@ -1,0 +1,13 @@
+{
+  "content": "Tooling decision (2026-07-28): Context7 MCP is now the required way to fetch documentation for any library, framework, SDK, API, CLI, or cloud service before writing or changing code that touches it. Rationale: the project runs bleeding-edge versions (Kotlin 2.2, AGP 9, Compose BOM 2026.x) where training data is stale. Added a 'Context7 (current library documentation, required)' section to CLAUDE.md with the resolve-then-query flow and a seed id map (AndroidX /androidx/androidx; Compose /websites/developer_android_develop_ui_compose; /kotlin/kotlinx.serialization; /kotlin/kotlinx.coroutines). Others resolve on first use. Not for business logic, refactoring, or general concepts. AGENTS.md points Codex at it too.",
+  "createdDate": "2026-07-28",
+  "id": "N-004",
+  "status": "active",
+  "tags": [
+    "tooling",
+    "context7",
+    "decision"
+  ],
+  "title": null,
+  "updatedDate": "2026-07-28"
+}
