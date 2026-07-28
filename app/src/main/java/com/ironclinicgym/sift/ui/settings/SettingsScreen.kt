@@ -1,5 +1,6 @@
 package com.ironclinicgym.sift.ui.settings
 
+import android.app.TimePickerDialog
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -7,9 +8,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.clickable
@@ -36,6 +39,8 @@ import androidx.compose.runtime.setValue
 import com.ironclinicgym.sift.auth.AuthRepository
 import com.ironclinicgym.sift.core.board.Landmark
 import com.ironclinicgym.sift.core.board.OneDayLandmarks
+import com.ironclinicgym.sift.core.board.PrioritySettings
+import com.ironclinicgym.sift.core.board.formatHourMinute
 import com.ironclinicgym.sift.ui.board.BoardViewModel
 import com.ironclinicgym.sift.ui.board.CustomizeViewModel
 import androidx.compose.ui.Alignment
@@ -81,6 +86,8 @@ fun SettingsScreen(
     val tokens = SiftTheme.tokens
     val active = mappingSet.active
     val use24 = boardSettings?.use24HourTime == true
+    val priority by customizeVm.effectivePriority.collectAsStateWithLifecycle()
+    val useGlobalPriority = boardSettings?.useGlobalPrioritySettings != false
     val context = LocalContext.current
     var devUnlocked by rememberSaveable { mutableStateOf(false) }
     var showResetConfirm by remember { mutableStateOf(false) }
@@ -127,6 +134,47 @@ fun SettingsScreen(
                 showDivider = false,
                 onValueChange = { n -> customizeVm.setSingleColumnLimit(n) },
             )
+        }
+
+        priority?.let { p ->
+            SettingsGroup("Priority timing") {
+                SettingsRow(
+                    title = "Use across all databases",
+                    subtitle = if (useGlobalPriority) "One set of timing rules everywhere" else "This database has its own timing",
+                    icon = "tune",
+                    showDivider = true,
+                    onClick = null,
+                    trailing = {
+                        Switch(checked = useGlobalPriority, onCheckedChange = { customizeVm.setUseGlobalPrioritySettings(it) })
+                    },
+                )
+                SettingsNumberRow(
+                    title = "Soon: up to N days",
+                    subtitle = "Dates within this many days count as Soon",
+                    icon = "schedule",
+                    value = p.soonMaxDays,
+                    showDivider = true,
+                    onValueChange = { customizeVm.setSoonMaxDays(it) },
+                )
+                SettingsNumberRow(
+                    title = "Later: up to N days",
+                    subtitle = "Dates within this many days count as Later; beyond is One day",
+                    icon = "schedule",
+                    value = p.laterMaxDays,
+                    showDivider = true,
+                    onValueChange = { customizeVm.setLaterMaxDays(it) },
+                )
+                TimeSettingRow("Tomorrow time", p.tomorrowHour, p.tomorrowMinute, use24, showDivider = true) { h, m ->
+                    customizeVm.setTomorrowTime(h, m)
+                }
+                TimeSettingRow("Next week time", p.nextWeekHour, p.nextWeekMinute, use24, showDivider = true) { h, m ->
+                    customizeVm.setNextWeekTime(h, m)
+                }
+                TimeSettingRow("Next month time", p.nextMonthHour, p.nextMonthMinute, use24, showDivider = true) { h, m ->
+                    customizeVm.setNextMonthTime(h, m)
+                }
+                FirstDayOfWeekRow(p.firstDayOfWeek, showDivider = false) { customizeVm.setFirstDayOfWeek(it) }
+            }
         }
 
         SettingsGroup("Display") {
@@ -429,4 +477,66 @@ private fun SettingsNumberRow(
             )
         },
     )
+}
+
+private val WEEKDAY_NAMES = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+
+@Composable
+private fun TimeSettingRow(
+    title: String,
+    hour: Int,
+    minute: Int,
+    use24: Boolean,
+    showDivider: Boolean,
+    onTimeSet: (Int, Int) -> Unit,
+) {
+    val context = LocalContext.current
+    SettingsRow(
+        title = title,
+        subtitle = formatHourMinute(hour, minute, use24),
+        icon = "schedule",
+        showDivider = showDivider,
+        onClick = {
+            TimePickerDialog(
+                context,
+                { _, h, m -> onTimeSet(h, m) },
+                hour,
+                minute,
+                use24,
+            ).show()
+        },
+    )
+}
+
+@Composable
+private fun FirstDayOfWeekRow(firstDay: Int, showDivider: Boolean, onDaySet: (Int) -> Unit) {
+    var show by remember { mutableStateOf(false) }
+    SettingsRow(
+        title = "First day of week",
+        subtitle = WEEKDAY_NAMES[(firstDay - 1).coerceIn(0, 6)],
+        icon = "calendar_today",
+        showDivider = showDivider,
+        onClick = { show = true },
+    )
+    if (show) {
+        AlertDialog(
+            onDismissRequest = { show = false },
+            title = { Text("First day of week") },
+            text = {
+                Column {
+                    WEEKDAY_NAMES.forEachIndexed { index, name ->
+                        Text(
+                            name,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onDaySet(index + 1); show = false }
+                                .padding(vertical = 12.dp),
+                        )
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { show = false }) { Text("Close") } },
+        )
+    }
 }
