@@ -166,6 +166,7 @@ fun AddTaskSheetV2(
 
     val buckets = settings.buckets.filter { it.optionId != null }
     val todayIso = LocalDate.now().toString()
+    val prioritySettings by viewModel.effectivePrioritySettings.collectAsStateWithLifecycle()
 
     // Accent color for the input field border (today accent for the blinking cursor feel)
     val todayAccent = tokens.priorities.getOrNull(1)?.accent?.toColor()
@@ -191,7 +192,7 @@ fun AddTaskSheetV2(
     fun resolvedPriority(): Pair<String?, String?> {
         return when (whenPath) {
             WhenPath.DATE -> {
-                val band = DateBandEngine.resolveBand(selectedDate, todayIso)
+                val band = DateBandEngine.resolveBand(selectedDate, todayIso, prioritySettings.dateBandConfig())
                 if (band != null) {
                     val pv = settings.priorities.firstOrNull { it.colorKey == band.name }
                     (pv?.optionName ?: pv?.displayName) to pv?.optionId
@@ -584,19 +585,19 @@ fun AddTaskSheetV2(
                             whenPath = WhenPath.DATE
                         }
                         QuickDateChip("Tomorrow") {
-                            val (tmDate, tmTime) = quickDateTomorrow(todayIso)
+                            val (tmDate, tmTime) = quickDateTomorrow(todayIso, prioritySettings.tomorrowHour, prioritySettings.tomorrowMinute)
                             selectedDate = tmDate
                             time = tmTime
                             whenPath = WhenPath.DATE
                         }
                         QuickDateChip("Next week") {
-                            val (nwDate, nwTime) = quickDateNextWeek(todayIso)
+                            val (nwDate, nwTime) = quickDateNextWeek(todayIso, prioritySettings.firstDayOfWeek, prioritySettings.nextWeekHour, prioritySettings.nextWeekMinute)
                             selectedDate = nwDate
                             time = nwTime
                             whenPath = WhenPath.DATE
                         }
                         QuickDateChip("Next month") {
-                            val (nmDate, nmTime) = quickDateNextMonth(todayIso)
+                            val (nmDate, nmTime) = quickDateNextMonth(todayIso, prioritySettings.nextMonthHour, prioritySettings.nextMonthMinute)
                             selectedDate = nmDate
                             time = nmTime
                             whenPath = WhenPath.DATE

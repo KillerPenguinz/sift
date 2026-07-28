@@ -91,6 +91,20 @@ private fun OverdueTag() {
     }
 }
 
+/** Small uppercase blocked tag, mirrors OverdueTag's shape and typography with neutral tokens. */
+@Composable
+private fun BlockedTag() {
+    val tokens = SiftTheme.tokens
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(tokens.neutrals.border.toColor())
+            .padding(horizontal = 6.dp, vertical = 1.dp),
+    ) {
+        Text("BLOCKED", color = tokens.neutrals.textSecondary.toColor(), fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
 /** A compact task row: bucket tile, title (ellipsized), and an overdue tag or time. */
 @Composable
 fun TaskRow(item: ProjectedItem, expanded: Boolean, onClick: () -> Unit) {
@@ -127,10 +141,13 @@ fun TaskRow(item: ProjectedItem, expanded: Boolean, onClick: () -> Unit) {
                 }
             }
         }
-        when {
-            item.isOverdue -> OverdueTag()
-            item.timeLabel.isNotEmpty() && !expanded ->
-                Text(item.timeLabel, color = SiftTheme.tokens.neutrals.textTertiary.toColor(), fontSize = 12.sp)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            if (item.task.isBlocked) BlockedTag()
+            when {
+                item.isOverdue -> OverdueTag()
+                item.timeLabel.isNotEmpty() && !expanded ->
+                    Text(item.timeLabel, color = SiftTheme.tokens.neutrals.textTertiary.toColor(), fontSize = 12.sp)
+            }
         }
     }
 }

@@ -3,27 +3,40 @@ package com.ironclinicgym.sift.ui.board
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ironclinicgym.sift.core.board.BoardSettings
+import com.ironclinicgym.sift.core.board.PriorityEdit
 import com.ironclinicgym.sift.core.board.PrioritySchedule
+import com.ironclinicgym.sift.core.board.PrioritySettings
 import com.ironclinicgym.sift.core.board.addPriority
 import com.ironclinicgym.sift.core.board.hidePriority
 import com.ironclinicgym.sift.core.board.movePriority
 import com.ironclinicgym.sift.core.board.nextColorKey
+import com.ironclinicgym.sift.core.board.normalized
 import com.ironclinicgym.sift.core.board.recolorPriority
 import com.ironclinicgym.sift.core.board.recolorBucket
 import com.ironclinicgym.sift.core.board.removePriority
 import com.ironclinicgym.sift.core.board.reorderPriorities
 import com.ironclinicgym.sift.core.board.renamePriority
 import com.ironclinicgym.sift.core.board.renameBucket
+import com.ironclinicgym.sift.core.board.resolvePrioritySettings
+import com.ironclinicgym.sift.core.board.routePriorityEdit
 import com.ironclinicgym.sift.core.board.setBucketIcon
 import com.ironclinicgym.sift.core.board.setBucketSchedule
+import com.ironclinicgym.sift.core.board.setFirstDayOfWeek
+import com.ironclinicgym.sift.core.board.setLaterMaxDays
+import com.ironclinicgym.sift.core.board.setNextMonthTime
+import com.ironclinicgym.sift.core.board.setNextWeekTime
 import com.ironclinicgym.sift.core.board.setOneDayLandmarkEnabled
 import com.ironclinicgym.sift.core.board.setSingleColumnLimit
+import com.ironclinicgym.sift.core.board.setSoonMaxDays
 import com.ironclinicgym.sift.core.board.setTimeGating
+import com.ironclinicgym.sift.core.board.setTomorrowTime
 import com.ironclinicgym.sift.core.board.setUse24HourTime
+import com.ironclinicgym.sift.core.board.setUseGlobalPrioritySettings
 import com.ironclinicgym.sift.core.board.showPriority
 import com.ironclinicgym.sift.core.board.toggleGlance
 import com.ironclinicgym.sift.core.board.unmappedOptions
 import com.ironclinicgym.sift.core.domain.ports.BoardSettingsStore
+import com.ironclinicgym.sift.core.domain.ports.PrioritySettingsStore
 import com.ironclinicgym.sift.core.mapping.PriorityBinding
 import com.ironclinicgym.sift.core.mapping.DatabaseMapping
 import com.ironclinicgym.sift.data.repository.SiftRepository
@@ -37,6 +50,8 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.util.UUID
 
 /**
@@ -45,9 +60,13 @@ import java.util.UUID
  * Notion priority options in the active mapping so added/removed priorities align with data.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
-class CustomizeViewModel(private val repository: SiftRepository, private val store: BoardSettingsStore) : ViewModel() {
+class CustomizeViewModel(
+    private val repository: SiftRepository,
+    private val store: BoardSettingsStore,
+    private val prioritySettingsStore: PrioritySettingsStore,
+) : ViewModel() {
 
-    constructor(container: AppContainer) : this(container.repository, container.boardSettingsStore)
+    constructor(container: AppContainer) : this(container.repository, container.boardSettingsStore, container.prioritySettingsStore)
 
     val mapping: StateFlow<DatabaseMapping?> = repository.mappingSet
         .map { it.active }
@@ -63,6 +82,59 @@ class CustomizeViewModel(private val repository: SiftRepository, private val sto
     val unmapped: StateFlow<List<PriorityBinding>> = combine(mapping, settings) { m, s ->
         if (m != null && s != null) unmappedOptions(m, s) else emptyList()
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    // Serializes scope toggles and priority-timing edits so a toggle and the edits around it apply
+    // in order, and concurrent edits never overwrite one another (single ViewModel instance).
+    private val priorityEditMutex = Mutex()
+
+    val globalPrioritySettings: StateFlow<PrioritySettings> = prioritySettingsStore.observe()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PrioritySettings.DEFAULT)
+
+    /** The priority-timing settings this database actually uses right now (global or its override). */
+    val effectivePriority: StateFlow<PrioritySettings?> = combine(settings, globalPrioritySettings) { s, g ->
+        if (s == null) null else resolvePrioritySettings(g, s)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    fun setUseGlobalPrioritySettings(useGlobal: Boolean) {
+        val current = settings.value ?: return
+        viewModelScope.launch {
+            priorityEditMutex.withLock {
+                // Read BOTH authoritative values from their stores inside the lock: the StateFlows
+                // (settings, globalPrioritySettings) lag DataStore writes, so seeding an override
+                // from the flow could copy a stale global.
+                val board = store.load(current.mappingId) ?: current
+                val global = prioritySettingsStore.load().normalized()
+                store.save(board.setUseGlobalPrioritySettings(useGlobal, global))
+            }
+        }
+    }
+
+    fun setSoonMaxDays(days: Int) = editPriority { it.setSoonMaxDays(days) }
+    fun setLaterMaxDays(days: Int) = editPriority { it.setLaterMaxDays(days) }
+    fun setTomorrowTime(hour: Int, minute: Int) = editPriority { it.setTomorrowTime(hour, minute) }
+    fun setNextWeekTime(hour: Int, minute: Int) = editPriority { it.setNextWeekTime(hour, minute) }
+    fun setNextMonthTime(hour: Int, minute: Int) = editPriority { it.setNextMonthTime(hour, minute) }
+    fun setFirstDayOfWeek(day: Int) = editPriority { it.setFirstDayOfWeek(day) }
+
+    /**
+     * Route a priority-timing edit to the active scope through the pure [routePriorityEdit], under
+     * the mutex. Reads BOTH authoritative values (board and global) from their stores inside the
+     * lock rather than from the lagging StateFlows, so back-to-back edits never transform a stale
+     * snapshot, and serializes concurrent edits so neither is lost.
+     */
+    private fun editPriority(transform: (PrioritySettings) -> PrioritySettings) {
+        val current = settings.value ?: return
+        viewModelScope.launch {
+            priorityEditMutex.withLock {
+                val board = store.load(current.mappingId) ?: current
+                val global = prioritySettingsStore.load().normalized()
+                when (val edit = routePriorityEdit(board, global, transform)) {
+                    is PriorityEdit.SaveGlobal -> prioritySettingsStore.save(edit.global)
+                    is PriorityEdit.SaveBoard -> store.save(edit.board)
+                }
+            }
+        }
+    }
 
     fun renamePriority(id: String, name: String) = edit { it.renamePriority(id, name) }
     fun recolorPriority(id: String, colorKey: String) = edit { it.recolorPriority(id, colorKey) }

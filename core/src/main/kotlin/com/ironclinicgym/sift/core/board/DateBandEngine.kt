@@ -23,6 +23,27 @@ data class DateBandConfig(
         )
 
         val DEFAULT = DateBandConfig()
+
+        /**
+         * Build a config from the two tunable boundaries. Overdue/today/tomorrow stay fixed; SOON
+         * covers days 2..soonMaxDays, LATER covers up to laterMaxDays, ONEDAY beyond. rangeDaysEnd
+         * is exclusive, so "up to N days" maps to end = N + 1. Clamps to 2 <= soonMaxDays < laterMaxDays
+         * so the bands always tile with no gap or overlap.
+         */
+        fun fromBoundaries(soonMaxDays: Int, laterMaxDays: Int): DateBandConfig {
+            val soon = soonMaxDays.coerceIn(2, 363)
+            val later = laterMaxDays.coerceIn(soon + 1, 364)
+            return DateBandConfig(
+                bands = listOf(
+                    DateBand(rangeDaysStart = Int.MIN_VALUE, rangeDaysEnd = 0, target = PriorityKey.ASAP),
+                    DateBand(rangeDaysStart = 0, rangeDaysEnd = 1, target = PriorityKey.TODAY),
+                    DateBand(rangeDaysStart = 1, rangeDaysEnd = 2, target = PriorityKey.TOMORROW),
+                    DateBand(rangeDaysStart = 2, rangeDaysEnd = soon + 1, target = PriorityKey.SOON),
+                    DateBand(rangeDaysStart = soon + 1, rangeDaysEnd = later + 1, target = PriorityKey.LATER),
+                    DateBand(rangeDaysStart = later + 1, rangeDaysEnd = Int.MAX_VALUE, target = PriorityKey.ONEDAY),
+                ),
+            )
+        }
     }
 }
 

@@ -1,0 +1,79 @@
+{
+  "planPath": "docs/superpowers/plans/2026-07-27-phase35-gap-tickets-and-signoff.md",
+  "tasks": [
+    {
+      "id": 1,
+      "subject": "Task 1: Date-band boundaries builder",
+      "status": "completed",
+      "description": "**Goal:** Pure DateBandConfig.fromBoundaries(soonMaxDays, laterMaxDays); moves only Soon/Later ends, keeps overdue/today/tomorrow fixed, clamped 2 <= soon < later.\n\n**Files:**\n- Modify: core/src/main/kotlin/com/ironclinicgym/sift/core/board/DateBandEngine.kt\n- Test: core/src/test/kotlin/com/ironclinicgym/sift/core/board/DateBandBoundariesTest.kt\n\n**Acceptance Criteria:**\n- fromBoundaries(7,30) equals DEFAULT_BANDS\n- resolveBand re-buckets with tuned config\n- clamping repairs inverted/low input\n\n**Verify:** ./gradlew :core:test --tests \"*DateBandBoundariesTest*\"\n\n```json:metadata\n{\"files\":[\"core/src/main/kotlin/com/ironclinicgym/sift/core/board/DateBandEngine.kt\",\"core/src/test/kotlin/com/ironclinicgym/sift/core/board/DateBandBoundariesTest.kt\"],\"verifyCommand\":\"./gradlew :core:test --tests \\\"*DateBandBoundariesTest*\\\"\",\"acceptanceCriteria\":[\"fromBoundaries(7,30) equals DEFAULT_BANDS\",\"resolveBand re-buckets\",\"clamping repairs input\"],\"modelTier\":\"mechanical\"}\n```"
+    },
+    {
+      "id": 2,
+      "subject": "Task 2: PrioritySettings model, resolver, scope fields",
+      "status": "completed",
+      "blockedBy": [1],
+      "description": "**Goal:** Serializable PrioritySettings (bands + quick-date times + first day) with clamped edits, dateBandConfig(), resolvePrioritySettings, BoardSettings scope fields, PrioritySettingsStore port.\n\n**Files:**\n- Create: core/src/main/kotlin/com/ironclinicgym/sift/core/board/PrioritySettings.kt\n- Modify: core/src/main/kotlin/com/ironclinicgym/sift/core/board/BoardSettings.kt\n- Modify: core/src/main/kotlin/com/ironclinicgym/sift/core/board/BoardSettingsEdits.kt\n- Modify: core/src/main/kotlin/com/ironclinicgym/sift/core/domain/ports/Ports.kt\n- Test: core/src/test/kotlin/com/ironclinicgym/sift/core/board/PrioritySettingsTest.kt\n\n**Acceptance Criteria:**\n- defaults soon 7, later 30, times 08:00, firstDayOfWeek 7\n- setters clamp keeping soon<later\n- resolver picks global/override (fallback global when null)\n- BoardSettings gains useGlobalPrioritySettings=true, prioritySettingsOverride=null\n\n**Verify:** ./gradlew :core:test --tests \"*PrioritySettingsTest*\"\n\n```json:metadata\n{\"files\":[\"core/src/main/kotlin/com/ironclinicgym/sift/core/board/PrioritySettings.kt\",\"core/src/main/kotlin/com/ironclinicgym/sift/core/board/BoardSettings.kt\",\"core/src/main/kotlin/com/ironclinicgym/sift/core/board/BoardSettingsEdits.kt\",\"core/src/main/kotlin/com/ironclinicgym/sift/core/domain/ports/Ports.kt\",\"core/src/test/kotlin/com/ironclinicgym/sift/core/board/PrioritySettingsTest.kt\"],\"verifyCommand\":\"./gradlew :core:test --tests \\\"*PrioritySettingsTest*\\\"\",\"acceptanceCriteria\":[\"defaults correct\",\"setters clamp\",\"resolver picks scope\",\"BoardSettings scope fields\"],\"modelTier\":\"standard\"}\n```"
+    },
+    {
+      "id": 3,
+      "subject": "Task 3: Parameterize quick-date defaults",
+      "status": "completed",
+      "description": "**Goal:** quickDateTomorrow/NextWeek/NextMonth accept configured local time (and first day of week), default params preserved.\n\n**Files:**\n- Modify: core/src/main/kotlin/com/ironclinicgym/sift/core/board/TimeFormat.kt\n- Test: core/src/test/kotlin/com/ironclinicgym/sift/core/board/QuickDateTest.kt\n\n**Acceptance Criteria:**\n- tomorrow(today,9,30) -> tomorrow 09:30\n- nextWeek(today,firstDayOfWeek=1,8,0) -> next Monday 08:00; =7 -> next Sunday (legacy)\n- nextMonth(today,7,15) -> 1st next month 07:15\n- no-arg calls default 08:00 / Sunday\n\n**Verify:** ./gradlew :core:test --tests \"*QuickDateTest*\"\n\n```json:metadata\n{\"files\":[\"core/src/main/kotlin/com/ironclinicgym/sift/core/board/TimeFormat.kt\",\"core/src/test/kotlin/com/ironclinicgym/sift/core/board/QuickDateTest.kt\"],\"verifyCommand\":\"./gradlew :core:test --tests \\\"*QuickDateTest*\\\"\",\"acceptanceCriteria\":[\"tomorrow honors time\",\"next week honors first-day+time and legacy\",\"next month honors time\",\"defaults preserved\"],\"modelTier\":\"mechanical\"}\n```"
+    },
+    {
+      "id": 4,
+      "subject": "Task 4: Global PrioritySettings DataStore and DI",
+      "status": "completed",
+      "blockedBy": [2],
+      "description": "**Goal:** Global DataStore implementing PrioritySettingsStore, wired into AppContainer, cleared on reset.\n\n**Files:**\n- Create: app/src/main/java/com/ironclinicgym/sift/data/local/PrioritySettingsDataStore.kt\n- Modify: app/src/main/java/com/ironclinicgym/sift/di/AppContainer.kt\n\n**Acceptance Criteria:**\n- single global JSON blob, default PrioritySettings.DEFAULT when unset\n- AppContainer exposes prioritySettingsStore\n- resetToNewUserState clears the store\n\n**Verify:** ./gradlew :app:compileDebugKotlin\n\n```json:metadata\n{\"files\":[\"app/src/main/java/com/ironclinicgym/sift/data/local/PrioritySettingsDataStore.kt\",\"app/src/main/java/com/ironclinicgym/sift/di/AppContainer.kt\"],\"verifyCommand\":\"./gradlew :app:compileDebugKotlin\",\"acceptanceCriteria\":[\"global blob defaults\",\"AppContainer exposes store\",\"reset clears\"],\"modelTier\":\"standard\"}\n```"
+    },
+    {
+      "id": 5,
+      "subject": "Task 5: CustomizeViewModel scope-aware edits",
+      "status": "completed",
+      "blockedBy": [4],
+      "description": "**Goal:** CustomizeViewModel gains global store, effective flow, scope toggle, edit methods routing to active scope.\n\n**Files:**\n- Modify: app/src/main/java/com/ironclinicgym/sift/ui/board/CustomizeViewModel.kt\n\n**Acceptance Criteria:**\n- ctor takes prioritySettingsStore; AppContainer ctor passes it\n- globalPrioritySettings + effectivePriority flows exposed\n- setUseGlobalPrioritySettings + band/time/day setters route to active scope\n\n**Verify:** ./gradlew :app:compileDebugKotlin\n\n```json:metadata\n{\"files\":[\"app/src/main/java/com/ironclinicgym/sift/ui/board/CustomizeViewModel.kt\"],\"verifyCommand\":\"./gradlew :app:compileDebugKotlin\",\"acceptanceCriteria\":[\"ctor takes store\",\"flows exposed\",\"edits route to scope\"],\"modelTier\":\"standard\"}\n```"
+    },
+    {
+      "id": 6,
+      "subject": "Task 6: BoardViewModel effective config wiring",
+      "status": "completed",
+      "blockedBy": [4],
+      "description": "**Goal:** Expose effective PrioritySettings on BoardViewModel; rebuild TwoAxisPolicy from it without restart.\n\n**Files:**\n- Modify: app/src/main/java/com/ironclinicgym/sift/ui/board/BoardViewModel.kt\n\n**Acceptance Criteria:**\n- ctor takes prioritySettingsStore from AppContainer\n- twoAxisPolicy rebuilt on effective-settings change (var from initialPolicy)\n- effectivePrioritySettings StateFlow exposed\n\n**Verify:** ./gradlew :app:compileDebugKotlin\n\n```json:metadata\n{\"files\":[\"app/src/main/java/com/ironclinicgym/sift/ui/board/BoardViewModel.kt\"],\"verifyCommand\":\"./gradlew :app:compileDebugKotlin\",\"acceptanceCriteria\":[\"ctor takes store\",\"policy rebuilt\",\"flow exposed\"],\"modelTier\":\"standard\"}\n```"
+    },
+    {
+      "id": 7,
+      "subject": "Task 7: AddTaskSheetV2 uses effective config",
+      "status": "completed",
+      "blockedBy": [6, 3],
+      "description": "**Goal:** Add-task sheet resolves band preview and quick-date chips from effective PrioritySettings.\n\n**Files:**\n- Modify: app/src/main/java/com/ironclinicgym/sift/ui/board/AddTaskSheetV2.kt\n\n**Acceptance Criteria:**\n- collects viewModel.effectivePrioritySettings via collectAsStateWithLifecycle\n- resolveBand uses prioritySettings.dateBandConfig()\n- Tomorrow/Next week/Next month chips pass configured values; Later today unchanged\n\n**Verify:** ./gradlew :app:compileDebugKotlin\n\n```json:metadata\n{\"files\":[\"app/src/main/java/com/ironclinicgym/sift/ui/board/AddTaskSheetV2.kt\"],\"verifyCommand\":\"./gradlew :app:compileDebugKotlin\",\"acceptanceCriteria\":[\"collects effective settings\",\"band preview uses config\",\"chips pass configured values\"],\"modelTier\":\"standard\"}\n```"
+    },
+    {
+      "id": 8,
+      "subject": "Task 8: Settings Priority timing section",
+      "status": "completed",
+      "blockedBy": [5],
+      "description": "**Goal:** Settings section: scope toggle, two band steppers, three default-time rows, first-day-of-week selector.\n\n**Files:**\n- Modify: app/src/main/java/com/ironclinicgym/sift/ui/settings/SettingsScreen.kt\n\n**Acceptance Criteria:**\n- Priority timing group renders all controls\n- edits call matching customizeVm method; scope toggle calls setUseGlobalPrioritySettings\n- time rows respect use24 + open picker; day row opens 7-day chooser\n- tokens only; no hyphens/em dashes\n\n**Verify:** ./gradlew :app:assembleDebug\n\n```json:metadata\n{\"files\":[\"app/src/main/java/com/ironclinicgym/sift/ui/settings/SettingsScreen.kt\"],\"verifyCommand\":\"./gradlew :app:assembleDebug\",\"acceptanceCriteria\":[\"group renders controls\",\"edits call vm\",\"time rows + picker\",\"token discipline\"],\"modelTier\":\"standard\"}\n```"
+    },
+    {
+      "id": 9,
+      "subject": "Task 9: Blocked toggle in task detail sheet",
+      "status": "completed",
+      "description": "**Goal:** Blocked toggle in task detail drawer calling existing toggleBlocked, optimistic in-place state.\n\n**Files:**\n- Modify: app/src/main/java/com/ironclinicgym/sift/ui/board/TaskDetailSheet.kt\n- Modify: app/src/main/java/com/ironclinicgym/sift/ui/board/BoardScreen.kt\n- Modify: app/src/main/java/com/ironclinicgym/sift/ui/board/FocusedBucketScreen.kt\n\n**Acceptance Criteria:**\n- onToggleBlocked param; both call sites pass toggleBlocked(item.task.pageId)\n- secondary control Mark blocked / Blocked toggles optimistic state\n- reuses existing event_busy glyph; no new codepoint\n\n**Verify:** ./gradlew :app:assembleDebug\n\n```json:metadata\n{\"files\":[\"app/src/main/java/com/ironclinicgym/sift/ui/board/TaskDetailSheet.kt\",\"app/src/main/java/com/ironclinicgym/sift/ui/board/BoardScreen.kt\",\"app/src/main/java/com/ironclinicgym/sift/ui/board/FocusedBucketScreen.kt\"],\"verifyCommand\":\"./gradlew :app:assembleDebug\",\"acceptanceCriteria\":[\"onToggleBlocked + call sites\",\"toggle optimistic state\",\"reuses event_busy\"],\"modelTier\":\"standard\"}\n```"
+    },
+    {
+      "id": 10,
+      "subject": "Task 10: Blocked indicator on board card",
+      "status": "completed",
+      "description": "**Goal:** BLOCKED tag on the board task row when blocked, reusing OverdueTag text-tag pattern (no new glyph).\n\n**Files:**\n- Modify: app/src/main/java/com/ironclinicgym/sift/ui/board/BoardComponents.kt\n\n**Acceptance Criteria:**\n- BlockedTag mirrors OverdueTag shape/typography with neutral tokens\n- TaskRow shows tag when item.task.isBlocked, alongside overdue/time trailing\n- no hardcoded colors; no new codepoint\n\n**Verify:** ./gradlew :app:assembleDebug\n\n```json:metadata\n{\"files\":[\"app/src/main/java/com/ironclinicgym/sift/ui/board/BoardComponents.kt\"],\"verifyCommand\":\"./gradlew :app:assembleDebug\",\"acceptanceCriteria\":[\"BlockedTag mirrors OverdueTag\",\"TaskRow shows tag alongside trailing\",\"no hardcoded colors/glyph\"],\"modelTier\":\"standard\"}\n```"
+    },
+    {
+      "id": 11,
+      "subject": "Task 11: UAT round 3 script + owned-test run",
+      "status": "completed",
+      "blockedBy": [7, 8, 9, 10],
+      "description": "**USER-ORDERED GATE — NON-SKIPPABLE.** Requested by the user this conversation. Do not walk around it or declare it verified inline. Close only after every acceptance criterion is re-validated with output captured.\n\n**Goal:** Assemble the consolidated on-device UAT round 3 script and run every Claude-owned test with captured counts, so Phase 3.5 can be signed off.\n\n**Files:**\n- Create: docs/PHASE_3_5_UAT_round3.md\n\n**Acceptance Criteria:**\n- script covers full Phase 3.5 (spec 16 + 19 + Round-1 [manual] + blocked flag + date bands + quick-date incl scope)\n- tagged checkboxes by area\n- :core:test passes (captured)\n- :app:testDebugUnitTest passes incl BoardIconsFontTest (captured)\n- :app:assembleDebug succeeds (captured)\n- results section records summaries; sign-off gated on BJ device pass\n\n**Verify:** ./gradlew :core:test :app:testDebugUnitTest :app:assembleDebug\n\n```json:metadata\n{\"files\":[\"docs/PHASE_3_5_UAT_round3.md\"],\"verifyCommand\":\"./gradlew :core:test :app:testDebugUnitTest :app:assembleDebug\",\"acceptanceCriteria\":[\"script covers full phase 3.5\",\"tagged checkboxes\",\"core:test captured\",\"app tests captured\",\"assembleDebug captured\",\"sign-off gated on device pass\"],\"userGate\":true,\"tags\":[\"user-gate\"],\"gateScope\":\"then all\",\"modelTier\":\"standard\"}\n```"
+    }
+  ],
+  "lastUpdated": "2026-07-27T00:00:00Z"
+}

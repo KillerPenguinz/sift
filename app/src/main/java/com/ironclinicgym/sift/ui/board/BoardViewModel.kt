@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.ironclinicgym.sift.core.board.BoardProjection
 import com.ironclinicgym.sift.core.board.BoardSettings
 import com.ironclinicgym.sift.core.board.ClockSnapshot
+import com.ironclinicgym.sift.core.board.PrioritySettings
 import com.ironclinicgym.sift.core.board.ProjectedItem
 import com.ironclinicgym.sift.core.board.ProjectedPriority
 import com.ironclinicgym.sift.core.board.SafetyCatchEvaluation
@@ -16,6 +17,7 @@ import com.ironclinicgym.sift.core.board.evaluateSafetyCatch
 import com.ironclinicgym.sift.core.board.formatHourMinute
 import com.ironclinicgym.sift.core.board.projectBoard
 import com.ironclinicgym.sift.core.board.projectBrainDump
+import com.ironclinicgym.sift.core.board.resolvePrioritySettings
 import com.ironclinicgym.sift.core.domain.ActionHistoryEntry
 import com.ironclinicgym.sift.core.domain.NotificationTier
 import com.ironclinicgym.sift.core.domain.PolicyDecision
@@ -35,6 +37,7 @@ import com.ironclinicgym.sift.core.domain.ports.ActionHistoryStore
 import com.ironclinicgym.sift.core.domain.ports.BoardSettingsStore
 import com.ironclinicgym.sift.core.domain.ports.LabelStore
 import com.ironclinicgym.sift.core.domain.ports.NotificationStore
+import com.ironclinicgym.sift.core.domain.ports.PrioritySettingsStore
 import com.ironclinicgym.sift.core.domain.ports.TaskLocalState
 import com.ironclinicgym.sift.core.domain.ports.TaskLocalStateStore
 import com.ironclinicgym.sift.core.mapping.DatabaseMapping
@@ -61,6 +64,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import com.ironclinicgym.sift.core.board.InflationKind
 import java.time.Instant
 import java.time.LocalDate
@@ -87,6 +92,7 @@ class BoardViewModel(
     private val notificationStore: NotificationStore,
     private val actionHistoryStore: ActionHistoryStore,
     private val labelStore: LabelStore,
+    private val prioritySettingsStore: PrioritySettingsStore,
 ) : ViewModel() {
 
     constructor(container: AppContainer) : this(
@@ -100,6 +106,7 @@ class BoardViewModel(
         container.notificationStore,
         container.actionHistoryStore,
         container.labelStore,
+        container.prioritySettingsStore,
     )
 
     private val writeService get() = repository.writeService
@@ -164,6 +171,12 @@ class BoardViewModel(
             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** The priority-timing settings the active board uses (global or its per-database override). */
+    val effectivePrioritySettings: StateFlow<PrioritySettings> =
+        combine(settings, prioritySettingsStore.observe()) { s, g ->
+            if (s == null) g else resolvePrioritySettings(g, s)
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PrioritySettings.DEFAULT)
 
     val availableLabels: StateFlow<List<String>> =
         repository.activeTasks.map { tasks ->
@@ -936,16 +949,29 @@ class BoardViewModel(
         }
     }
 
+    /** Idempotent: persist the desired blocked value (safe under rapid taps). */
+    fun setBlocked(pageId: String, blocked: Boolean) {
+        viewModelScope.launch {
+            upsertLocalField(pageId) { it.copy(isBlocked = blocked) }
+        }
+    }
+
     fun setBrainDump(pageId: String, reviewDateIso: String? = null) {
         viewModelScope.launch {
             upsertLocalField(pageId) { it.copy(isBrainDump = true, reviewDateIso = reviewDateIso) }
         }
     }
 
+    // Orders every TaskLocalState read-modify-upsert so concurrent flag writes to the same page
+    // never overwrite one another; for a given field, the last intent wins.
+    private val localStateMutex = Mutex()
+
     private suspend fun upsertLocalField(pageId: String, transform: (TaskLocalState) -> TaskLocalState) {
-        val mappingId = repository.mappingSet.value.active?.id ?: return
-        val current = localStateStore.get(pageId) ?: TaskLocalState(pageId = pageId, mappingId = mappingId)
-        localStateStore.upsert(transform(current).copy(lastModifiedAt = System.currentTimeMillis()))
+        localStateMutex.withLock {
+            val mappingId = repository.mappingSet.value.active?.id ?: return
+            val current = localStateStore.get(pageId) ?: TaskLocalState(pageId = pageId, mappingId = mappingId)
+            localStateStore.upsert(transform(current).copy(lastModifiedAt = System.currentTimeMillis()))
+        }
     }
 
     private fun findTask(pageId: String): SiftTask? =

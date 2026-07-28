@@ -1,6 +1,7 @@
 package com.ironclinicgym.sift.core.domain.ports
 
 import com.ironclinicgym.sift.core.board.BoardSettings
+import com.ironclinicgym.sift.core.board.PrioritySettings
 import com.ironclinicgym.sift.core.domain.SiftTask
 import com.ironclinicgym.sift.core.mapping.MappingSet
 import com.ironclinicgym.sift.core.oauth.TokenBundle
@@ -92,4 +93,11 @@ interface BoardSettingsStore {
     fun observe(mappingId: String): Flow<BoardSettings?>
     suspend fun load(mappingId: String): BoardSettings?
     suspend fun save(settings: BoardSettings)
+}
+
+/** Global (not mapping-keyed) priority-timing settings. Backed by DataStore in the platform layer. */
+interface PrioritySettingsStore {
+    fun observe(): Flow<PrioritySettings>
+    suspend fun load(): PrioritySettings
+    suspend fun save(settings: PrioritySettings)
 }

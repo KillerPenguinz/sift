@@ -115,3 +115,15 @@ fun BoardSettings.nextColorKey(): String = PRIORITY_META[priorities.size % PRIOR
 
 /** Resolves [BoardSettings.singleColumnLimit] to an actual row cap, mapping the "Show all" sentinel (0) to no cap. */
 fun BoardSettings.resolvedSingleColumnLimit(): Int = if (singleColumnLimit <= 0) Int.MAX_VALUE else singleColumnLimit
+
+/**
+ * Toggle whether this database follows the global priority-timing settings. Turning the override
+ * ON seeds it from the current global values so nothing visibly changes at the flip; turning it OFF
+ * leaves the override in place (unused) so it can be restored later.
+ */
+fun BoardSettings.setUseGlobalPrioritySettings(useGlobal: Boolean, seedFromGlobal: PrioritySettings): BoardSettings =
+    if (useGlobal) copy(useGlobalPrioritySettings = true)
+    else copy(useGlobalPrioritySettings = false, prioritySettingsOverride = prioritySettingsOverride ?: seedFromGlobal)
+
+fun BoardSettings.setPrioritySettingsOverride(settings: PrioritySettings): BoardSettings =
+    copy(prioritySettingsOverride = settings)

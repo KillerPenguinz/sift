@@ -135,30 +135,39 @@ fun quickDateLaterToday(nowHour: Int, nowMinute: Int, todayIso: String): Pair<St
     }
 }
 
-/** Returns (dateIso, Pair<8, 0>) for the "Tomorrow" chip. */
-fun quickDateTomorrow(todayIso: String): Pair<String, Pair<Int, Int>> {
-    val y = todayIso.substring(0, 4).toIntOrNull() ?: return todayIso to (8 to 0)
-    val m = todayIso.substring(5, 7).toIntOrNull() ?: return todayIso to (8 to 0)
-    val d = todayIso.substring(8, 10).toIntOrNull() ?: return todayIso to (8 to 0)
-    return epochDaysToIso(daysSinceEpoch(y, m, d) + 1L) to (8 to 0)
+/** Returns (dateIso, time) for the "Tomorrow" chip at the configured local time. */
+fun quickDateTomorrow(todayIso: String, hour: Int = 8, minute: Int = 0): Pair<String, Pair<Int, Int>> {
+    val y = todayIso.substring(0, 4).toIntOrNull() ?: return todayIso to (hour to minute)
+    val m = todayIso.substring(5, 7).toIntOrNull() ?: return todayIso to (hour to minute)
+    val d = todayIso.substring(8, 10).toIntOrNull() ?: return todayIso to (hour to minute)
+    return epochDaysToIso(daysSinceEpoch(y, m, d) + 1L) to (hour to minute)
 }
 
-/** Returns (dateIso, Pair<8, 0>) for "Next week": next Sunday at 8am. Default first day of week;
- *  configurable in Settings (not yet wired — update this when Settings wires the preference). */
-fun quickDateNextWeek(todayIso: String): Pair<String, Pair<Int, Int>> {
-    val y = todayIso.substring(0, 4).toIntOrNull() ?: return todayIso to (8 to 0)
-    val m = todayIso.substring(5, 7).toIntOrNull() ?: return todayIso to (8 to 0)
-    val d = todayIso.substring(8, 10).toIntOrNull() ?: return todayIso to (8 to 0)
-    val dow = dayOfWeek(y, m, d) // 0=Monday … 6=Sunday
-    val daysToAdd = if (dow == 6) 7L else (6 - dow).toLong()
-    return epochDaysToIso(daysSinceEpoch(y, m, d) + daysToAdd) to (8 to 0)
+/**
+ * Returns (dateIso, time) for "Next week": the next occurrence of [firstDayOfWeek] strictly in the
+ * future, at the configured local time. [firstDayOfWeek] is 1 = Monday .. 7 = Sunday (default Sunday).
+ */
+fun quickDateNextWeek(
+    todayIso: String,
+    firstDayOfWeek: Int = 7,
+    hour: Int = 8,
+    minute: Int = 0,
+): Pair<String, Pair<Int, Int>> {
+    val y = todayIso.substring(0, 4).toIntOrNull() ?: return todayIso to (hour to minute)
+    val m = todayIso.substring(5, 7).toIntOrNull() ?: return todayIso to (hour to minute)
+    val d = todayIso.substring(8, 10).toIntOrNull() ?: return todayIso to (hour to minute)
+    val dow = dayOfWeek(y, m, d)                 // 0 = Monday .. 6 = Sunday
+    val target = (firstDayOfWeek.coerceIn(1, 7) - 1)  // 0 = Monday .. 6 = Sunday
+    var delta = (target - dow + 7) % 7
+    if (delta == 0) delta = 7                    // always strictly in the future
+    return epochDaysToIso(daysSinceEpoch(y, m, d) + delta.toLong()) to (hour to minute)
 }
 
-/** Returns (dateIso, Pair<8, 0>) for "Next month": 1st of next calendar month at 8am. */
-fun quickDateNextMonth(todayIso: String): Pair<String, Pair<Int, Int>> {
-    val y = todayIso.substring(0, 4).toIntOrNull() ?: return todayIso to (8 to 0)
-    val m = todayIso.substring(5, 7).toIntOrNull() ?: return todayIso to (8 to 0)
+/** Returns (dateIso, time) for "Next month": 1st of next calendar month at the configured local time. */
+fun quickDateNextMonth(todayIso: String, hour: Int = 8, minute: Int = 0): Pair<String, Pair<Int, Int>> {
+    val y = todayIso.substring(0, 4).toIntOrNull() ?: return todayIso to (hour to minute)
+    val m = todayIso.substring(5, 7).toIntOrNull() ?: return todayIso to (hour to minute)
     val nextY = if (m == 12) y + 1 else y
     val nextM = if (m == 12) 1 else m + 1
-    return "%04d-%02d-01".format(nextY, nextM) to (8 to 0)
+    return "%04d-%02d-01".format(nextY, nextM) to (hour to minute)
 }
