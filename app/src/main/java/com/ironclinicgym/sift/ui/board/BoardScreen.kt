@@ -274,6 +274,7 @@ fun BoardScreen(
             onChangePriority = { pv ->
                 viewModel.moveTask(item.task.pageId, pv.optionName ?: pv.displayName, pv.optionId)
             },
+            onSetBlocked = { blocked -> viewModel.setBlocked(item.task.pageId, blocked) },
             onDismiss = { selectedTask = null },
             frictionActive = protectedFriction != null,
         )

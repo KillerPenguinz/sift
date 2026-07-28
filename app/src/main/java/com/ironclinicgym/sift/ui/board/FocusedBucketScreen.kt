@@ -260,6 +260,7 @@ fun FocusedPriorityScreen(viewModel: BoardViewModel, priorityId: String, onBack:
                 onChangePriority = { pv ->
                     viewModel.moveTask(item.task.pageId, pv.optionName ?: pv.displayName, pv.optionId)
                 },
+                onSetBlocked = { blocked -> viewModel.setBlocked(item.task.pageId, blocked) },
                 onDismiss = { selected = null },
                 frictionActive = protectedFriction != null,
             )

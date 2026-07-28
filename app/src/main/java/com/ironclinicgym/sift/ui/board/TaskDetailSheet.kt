@@ -67,6 +67,7 @@ fun TaskDetailSheet(
     onRemove: () -> Unit,
     onChangeDate: () -> Unit,
     onChangePriority: (PriorityView) -> Unit,
+    onSetBlocked: (Boolean) -> Unit,
     onDismiss: () -> Unit,
     /**
      * True while the host is showing the protected friction dialog. A chip tap that diverts to
@@ -84,6 +85,7 @@ fun TaskDetailSheet(
     // the task object passed in won't recompose with the new pin state until the parent's data
     // refreshes, so the sheet tracks its own optimistic copy of the cycle.
     var localPinLevel by remember(item.task.pageId) { mutableIntStateOf(item.task.pinLevel) }
+    var localBlocked by remember(item.task.pageId) { mutableStateOf(item.task.isBlocked) }
     var showInlinePriority by remember(item.task.pageId) { mutableStateOf(false) }
     // Local override for which priority chip reads as "selected" in the inline picker, for the
     // same reason as localPinLevel: item.task won't recompose in place after a move.
@@ -269,6 +271,16 @@ fun TaskDetailSheet(
             ) {
                 SecondaryActionButton("edit", "Edit", onEdit, Modifier.weight(1f))
                 SecondaryActionButton("delete", "Remove", onRemove, Modifier.weight(1f))
+                SecondaryActionButton(
+                    "event_busy",
+                    if (localBlocked) "Blocked" else "Mark blocked",
+                    {
+                        val next = !localBlocked
+                        localBlocked = next
+                        onSetBlocked(next)
+                    },
+                    Modifier.weight(1f),
+                )
             }
             Spacer(Modifier.height(9.dp))
             if (item.task.isDated) {

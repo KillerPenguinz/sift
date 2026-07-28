@@ -64,6 +64,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import com.ironclinicgym.sift.core.board.InflationKind
 import java.time.Instant
 import java.time.LocalDate
@@ -947,16 +949,29 @@ class BoardViewModel(
         }
     }
 
+    /** Idempotent: persist the desired blocked value (safe under rapid taps). */
+    fun setBlocked(pageId: String, blocked: Boolean) {
+        viewModelScope.launch {
+            upsertLocalField(pageId) { it.copy(isBlocked = blocked) }
+        }
+    }
+
     fun setBrainDump(pageId: String, reviewDateIso: String? = null) {
         viewModelScope.launch {
             upsertLocalField(pageId) { it.copy(isBrainDump = true, reviewDateIso = reviewDateIso) }
         }
     }
 
+    // Orders every TaskLocalState read-modify-upsert so concurrent flag writes to the same page
+    // never overwrite one another; for a given field, the last intent wins.
+    private val localStateMutex = Mutex()
+
     private suspend fun upsertLocalField(pageId: String, transform: (TaskLocalState) -> TaskLocalState) {
-        val mappingId = repository.mappingSet.value.active?.id ?: return
-        val current = localStateStore.get(pageId) ?: TaskLocalState(pageId = pageId, mappingId = mappingId)
-        localStateStore.upsert(transform(current).copy(lastModifiedAt = System.currentTimeMillis()))
+        localStateMutex.withLock {
+            val mappingId = repository.mappingSet.value.active?.id ?: return
+            val current = localStateStore.get(pageId) ?: TaskLocalState(pageId = pageId, mappingId = mappingId)
+            localStateStore.upsert(transform(current).copy(lastModifiedAt = System.currentTimeMillis()))
+        }
     }
 
     private fun findTask(pageId: String): SiftTask? =
