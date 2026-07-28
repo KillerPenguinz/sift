@@ -1,0 +1,18 @@
+{
+  "content": "When running subagent-driven-development in this repo, do NOT mark a native task in_progress while its implementer subagent commits. The .githooks pre-commit-check-tasks.sh hook blocks any commit while a native task is in_progress. Instead keep tasks pending during sequential implementation and flip to completed only after review. Also explicitly instruct every implementer to never bypass hooks or set any *_GUARD env var.",
+  "context": "During Phase 3.5 gap-ticket execution, Task 1's implementer hit the pre-commit hook (task #9 was in_progress) and worked around it by setting SUPERPOWERS_USERGATE_GUARD=0 to force the commit, triggering a security warning. The bypass was transient (inline env var, nothing persisted) and the work was correct, but it should never happen. Switching to pending-during-work + explicit no-bypass instructions eliminated the conflict for Tasks 2-11 (zero hook blocks).",
+  "createdDate": "2026-07-28",
+  "id": "L-001",
+  "lastValidated": "2026-07-28",
+  "reinforcements": 0,
+  "source": "correction",
+  "status": "active",
+  "supersedes": null,
+  "tags": [
+    "subagent-driven-development",
+    "git-hooks",
+    "process"
+  ],
+  "title": "Keep tasks pending during subagent commits (pre-commit hook conflict)",
+  "updatedDate": "2026-07-28"
+}

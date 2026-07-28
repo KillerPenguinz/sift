@@ -1,12 +1,13 @@
 {
   "blockedBy": [],
-  "completedDate": null,
+  "completedDate": "2026-07-27",
   "createdDate": "2026-07-28",
   "description": "DateBandConfig is modeled in core but never referenced by the app. Expose the overdue, today, tomorrow, soon, later, and one-day bands as editable settings.",
+  "displayId": "T-008",
   "id": "T-008",
   "order": 40,
   "phase": "p35",
-  "status": "open",
+  "status": "complete",
   "title": "Wire date-to-priority bands to Settings",
   "type": "task"
 }

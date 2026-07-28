@@ -1,12 +1,13 @@
 {
   "blockedBy": [],
-  "completedDate": null,
+  "completedDate": "2026-07-27",
   "createdDate": "2026-07-28",
   "description": "SiftTask.isBlocked and BoardViewModel.toggleBlocked exist end to end but no composable calls them. Add a blocked toggle on task detail and a swipe with a visible indicator, per PHASE_3_5_SPEC.",
+  "displayId": "T-006",
   "id": "T-006",
   "order": 20,
   "phase": "p35",
-  "status": "open",
+  "status": "complete",
   "title": "Blocked-flag UI surface",
   "type": "task"
 }
